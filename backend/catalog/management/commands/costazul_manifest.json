@@ -1,0 +1,407 @@
+[
+  {
+    "family": "Arroz",
+    "source": "costazul",
+    "source_ref": "56401",
+    "url": "https://costazul.sigo.com.ve/arroz-blanco-la-lucha-1k",
+    "expected_name": "Arroz Blanco La Lucha 1 Kg",
+    "brand": "La Lucha",
+    "expected_price": "$1.15"
+  },
+  {
+    "family": "Arroz",
+    "source": "costazul",
+    "source_ref": "57117",
+    "url": "https://costazul.sigo.com.ve/arroz-blanco-pantera-908g",
+    "expected_name": "Arroz Blanco Pantera 908 Gr",
+    "brand": "Pantera",
+    "expected_price": "$1.27"
+  },
+  {
+    "family": "Arroz",
+    "source": "costazul",
+    "source_ref": "59988",
+    "url": "https://costazul.sigo.com.ve/arroz-blanco-primor-tradicional-900gr",
+    "expected_name": "Arroz Blanco Primor Tradicional 900Gr",
+    "brand": "Primor",
+    "expected_price": "$1.05"
+  },
+  {
+    "family": "Azucar",
+    "source": "costazul",
+    "source_ref": "59221",
+    "url": "https://costazul.sigo.com.ve/azucar-blanca-amanecer-1k",
+    "expected_name": "Azúcar Blanca Amanecer 1kg",
+    "brand": "Amanecer",
+    "expected_price": "$1.48"
+  },
+  {
+    "family": "Azucar",
+    "source": "costazul",
+    "source_ref": "6518",
+    "url": "https://costazul.sigo.com.ve/az%C3%BAcar-montalban-1-k",
+    "expected_name": "Azúcar Montalban 1 K.",
+    "brand": "Montalban",
+    "expected_price": "$1.49"
+  },
+  {
+    "family": "Azucar",
+    "source": "costazul",
+    "source_ref": "26392",
+    "url": "https://costazul.sigo.com.ve/az%C3%BAcar-blanca-dulce-flower-900g-glass",
+    "expected_name": "Azúcar Blanca Dulce Flower Glass 900g",
+    "brand": "Dulces Flower",
+    "expected_price": "$3.35"
+  },
+  {
+    "family": "Harina de trigo",
+    "source": "costazul",
+    "source_ref": "57855",
+    "url": "https://costazul.sigo.com.ve/harina-de-trigo-dulce-mar-leudante-1k",
+    "expected_name": "Harina De Trigo Dulce Mar Leudante 1k",
+    "brand": "Dulce Mar",
+    "expected_price": "$1.09"
+  },
+  {
+    "family": "Harina de trigo",
+    "source": "costazul",
+    "source_ref": "56511",
+    "url": "https://costazul.sigo.com.ve/harina-de-trigo-la-lucha-todo-uso-900g",
+    "expected_name": "Harina De Trigo La Lucha Todo Uso 900 Gr",
+    "brand": "La Lucha",
+    "expected_price": "$0.95"
+  },
+  {
+    "family": "Harina de trigo",
+    "source": "costazul",
+    "source_ref": "57854",
+    "url": "https://costazul.sigo.com.ve/harina-de-trigo-aveiro-panadera-todo-uso-1k",
+    "expected_name": "Harina De Trigo Aveiro Panadera Todo Uso 1k",
+    "brand": "Aveiro",
+    "expected_price": "$1.20"
+  },
+  {
+    "family": "Pasta",
+    "source": "costazul",
+    "source_ref": "59419",
+    "url": "https://costazul.sigo.com.ve/pasta-codo-allegri-1k",
+    "expected_name": "Pasta Codo Allegri 1k",
+    "brand": "Allegri",
+    "expected_price": "$1.99"
+  },
+  {
+    "family": "Pasta",
+    "source": "costazul",
+    "source_ref": "57851",
+    "url": "https://costazul.sigo.com.ve/pasta-codo-horizonte-1k",
+    "expected_name": "Pasta Codo Horizonte 1k",
+    "brand": "Horizonte",
+    "expected_price": "$1.85"
+  },
+  {
+    "family": "Pasta",
+    "source": "costazul",
+    "source_ref": "8235",
+    "url": "https://costazul.sigo.com.ve/pasta-cinta-n3-eduardo-250-gr",
+    "expected_name": "Pasta Cinta N3 Eduardo 250 Gr.",
+    "brand": "Eduardo",
+    "expected_price": "$2.50"
+  },
+  {
+    "family": "Mayonesa",
+    "source": "costazul",
+    "source_ref": "1874",
+    "url": "https://costazul.sigo.com.ve/mayonesa-mavesa-445-gr-2",
+    "expected_name": "Mayonesa Mavesa 445 Gr.",
+    "brand": "Mavesa",
+    "expected_price": "$4.05"
+  },
+  {
+    "family": "Mayonesa",
+    "source": "costazul",
+    "source_ref": "2805",
+    "url": "https://costazul.sigo.com.ve/mayonesa-kraft-445-gr",
+    "expected_name": "Mayonesa Kraft 445 Gr.",
+    "brand": "Kraft",
+    "expected_price": "$3.88"
+  },
+  {
+    "family": "Mayonesa",
+    "source": "costazul",
+    "source_ref": "18952",
+    "url": "https://costazul.sigo.com.ve/mayonesa-kaldini-445g",
+    "expected_name": "Mayonesa Kaldini 445Gr",
+    "brand": "Kaldini",
+    "expected_price": "$2.99"
+  },
+  {
+    "family": "Salsa de tomate",
+    "source": "costazul",
+    "source_ref": "2522",
+    "url": "https://costazul.sigo.com.ve/salsa-de-tomate-pampero-397-gr",
+    "expected_name": "Salsa de Tomate Pampero 397 Gr.",
+    "brand": "Pampero",
+    "expected_price": "$1.80"
+  },
+  {
+    "family": "Salsa de tomate",
+    "source": "costazul",
+    "source_ref": "2599",
+    "url": "https://costazul.sigo.com.ve/salsa-de-tomate-concentrada-kaldini-400-gr",
+    "expected_name": "Salsa De Tomate Concentrada Kaldini 400 Gr.",
+    "brand": "Kaldini",
+    "expected_price": "$2.79"
+  },
+  {
+    "family": "Cheese Tris",
+    "source": "costazul",
+    "source_ref": "1806",
+    "url": "https://costazul.sigo.com.ve/snack-cheese-tris-frito-lay-150-gr",
+    "expected_name": "Cheese Tris Frito-Lay 150 Gr.",
+    "brand": "Frito-Lay",
+    "expected_price": "$1.70"
+  },
+  {
+    "family": "Cheese Tris",
+    "source": "costazul",
+    "source_ref": "1808",
+    "url": "https://costazul.sigo.com.ve/snack-cheese-tris-frito-lay-400-gr",
+    "expected_name": "Snack Cheese Tris Frito-Lay 450 Gr.",
+    "brand": "Frito-Lay",
+    "expected_price": "$4.55"
+  },
+  {
+    "family": "Tostones",
+    "source": "costazul",
+    "source_ref": "5133",
+    "url": "https://costazul.sigo.com.ve/tostones-de-ajo-intenso-munchy-110-gr",
+    "expected_name": "Tostones De Ajo Intenso Munchy 110 Gr.",
+    "brand": "Munchy",
+    "expected_price": "$2.36"
+  },
+  {
+    "family": "Caramelos",
+    "source": "costazul",
+    "source_ref": "14486",
+    "url": "https://costazul.sigo.com.ve/caramelo-de-fruta-mentos-297-gr",
+    "expected_name": "Caramelo De Fruta Mentos 29,7 Gr.",
+    "brand": "Mentos",
+    "expected_price": "$0.49"
+  },
+  {
+    "family": "Caramelos",
+    "source": "costazul",
+    "source_ref": "13552",
+    "url": "https://costazul.sigo.com.ve/caramelo-de-frutas-amanhecer-100-gr",
+    "expected_name": "Caramelo De Frutas Amanhecer 100 Gr.",
+    "brand": "Amanhecer",
+    "expected_price": "$1.30"
+  },
+  {
+    "family": "Caramelos",
+    "source": "costazul",
+    "source_ref": "27879",
+    "url": "https://costazul.sigo.com.ve/caram-halls-252g-cereza",
+    "expected_name": "Caramelo Duro Halls Cereza 25.2g",
+    "brand": "Halls",
+    "expected_price": "$0.50"
+  },
+  {
+    "family": "Chupetas",
+    "source": "costazul",
+    "source_ref": "23552",
+    "url": "https://costazul.sigo.com.ve/chupeta-kidsmania-34g-flash-pop",
+    "expected_name": "Chupeta Kidsmania Flash Pop 34G",
+    "brand": "Kidsmania",
+    "expected_price": "$3.70"
+  },
+  {
+    "family": "Chupetas",
+    "source": "costazul",
+    "source_ref": "57229",
+    "url": "https://costazul.sigo.com.ve/chupeta-push-pop-15g",
+    "expected_name": "Chupeta Push Pop 15 Gr",
+    "brand": "Push Pop",
+    "expected_price": "$0.99"
+  },
+  {
+    "family": "Chupetas",
+    "source": "costazul",
+    "source_ref": "14251",
+    "url": "https://costazul.sigo.com.ve/chupeta-de-fresa-intensa-colombina-456-gr",
+    "expected_name": "Chupeta De Fresa Intensa Colombina 456 Gr.",
+    "brand": "Colombina",
+    "expected_price": "$2.93"
+  },
+  {
+    "family": "Chicles",
+    "source": "costazul",
+    "source_ref": "53726",
+    "url": "https://costazul.sigo.com.ve/chicle-big-babol-de-frutas-37g",
+    "expected_name": "Chicle Big Babol De Frutas 37 Gr",
+    "brand": "Big Babol",
+    "expected_price": "$1.50"
+  },
+  {
+    "family": "Chicles",
+    "source": "costazul",
+    "source_ref": "63419",
+    "url": "https://costazul.sigo.com.ve/chicle-doublemint-wrigley-5und",
+    "expected_name": "Chicle Doublemint Wrigley 5und",
+    "brand": "Wrigley",
+    "expected_price": "$0.65"
+  },
+  {
+    "family": "Chicles",
+    "source": "costazul",
+    "source_ref": "20302",
+    "url": "https://costazul.sigo.com.ve/chicle-five-hierbabuena-15-und",
+    "expected_name": "Chicle Five Hierbabuena 15 Und",
+    "brand": "Five",
+    "expected_price": "$2.50"
+  },
+  {
+    "family": "Sardinas en lata",
+    "source": "costazul",
+    "source_ref": "59190",
+    "url": "https://costazul.sigo.com.ve/sardina-en-aceite-vegetal-della-nonna-170g",
+    "expected_name": "Sardina En Aceite Vegetal Della Nonna 170g",
+    "brand": "Della Nonna",
+    "expected_price": "$0.90"
+  },
+  {
+    "family": "Sardinas en lata",
+    "source": "costazul",
+    "source_ref": "2417",
+    "url": "https://costazul.sigo.com.ve/sardina-kaldini-125-gr",
+    "expected_name": "Sardina En Aceite Vegetal Kaldini 125 Gr.",
+    "brand": "Kaldini",
+    "expected_price": "$1.15"
+  },
+  {
+    "family": "Sardinas en lata",
+    "source": "costazul",
+    "source_ref": "184",
+    "url": "https://costazul.sigo.com.ve/sardina-en-aceite-vegetal-oriente-170-gr",
+    "expected_name": "Sardina En Aceite Vegetal Oriente 170 Gr.",
+    "brand": "Oriente",
+    "expected_price": "$1.24"
+  },
+  {
+    "family": "Refrescos",
+    "source": "costazul",
+    "source_ref": "282",
+    "url": "https://costazul.sigo.com.ve/refresco-7up-355-ml",
+    "expected_name": "Refresco 7UP 355 Ml.",
+    "brand": "7UP",
+    "expected_price": "$0.85"
+  },
+  {
+    "family": "Refrescos",
+    "source": "costazul",
+    "source_ref": "294",
+    "url": "https://costazul.sigo.com.ve/refresco-en-lata-pepsi-355-ml",
+    "expected_name": "Refresco Pepsi 355 Ml.",
+    "brand": "Pepsi",
+    "expected_price": "$0.85"
+  },
+  {
+    "family": "Refrescos",
+    "source": "costazul",
+    "source_ref": "6783",
+    "url": "https://costazul.sigo.com.ve/refresco-chinotto-1-l",
+    "expected_name": "Refresco Chinotto 1 L",
+    "brand": "Chinotto",
+    "expected_price": "$0.90"
+  },
+  {
+    "family": "Malta",
+    "source": "costazul",
+    "source_ref": "23113",
+    "url": "https://costazul.sigo.com.ve/malta-maltin-polar-355ml-lata",
+    "expected_name": "Malta Maltin Polar Lata 355Ml",
+    "brand": "Polar",
+    "expected_price": "$0.95"
+  },
+  {
+    "family": "Malta",
+    "source": "costazul",
+    "source_ref": "1815",
+    "url": "https://costazul.sigo.com.ve/malta-malt%C3%ADn-polar-15-l",
+    "expected_name": "Malta Maltín Polar 1.5 L.",
+    "brand": "Polar",
+    "expected_price": "$1.69"
+  },
+  {
+    "family": "Malta",
+    "source": "costazul",
+    "source_ref": "59731",
+    "url": "https://costazul.sigo.com.ve/malta-morena-lata-250ml",
+    "expected_name": "Malta Morena Lata 250ml",
+    "brand": "Morena",
+    "expected_price": "$0.69"
+  },
+  {
+    "family": "Galletas de sosa",
+    "source": "costazul",
+    "source_ref": "1780",
+    "url": "https://costazul.sigo.com.ve/galleta-de-soda-puig-250-gr",
+    "expected_name": "Galleta De Soda Puig 250 Gr.",
+    "brand": "Puig",
+    "expected_price": "$1.67"
+  },
+  {
+    "family": "Galletas de sosa",
+    "source": "costazul",
+    "source_ref": "565",
+    "url": "https://costazul.sigo.com.ve/galletas-de-soda-sol-puig-250-gr",
+    "expected_name": "Galletas de Soda El Sol Puig 250 Gr.",
+    "brand": "El Sol",
+    "expected_price": "$1.67"
+  },
+  {
+    "family": "Club Social",
+    "source": "costazul",
+    "source_ref": "59027",
+    "url": "https://costazul.sigo.com.ve/galleta-cracker-club-social-9-sobres-234gr",
+    "expected_name": "Galleta Cracker Club Social 9 Und 234Gr",
+    "brand": "Club Social",
+    "expected_price": "$2.20"
+  },
+  {
+    "family": "Club Social",
+    "source": "costazul",
+    "source_ref": "60492",
+    "url": "https://costazul.sigo.com.ve/galleta-cracker-integral-club-social-6-und",
+    "expected_name": "Galleta Cracker Integral Club Social 6 Und",
+    "brand": "Club Social",
+    "expected_price": "$2.50"
+  },
+  {
+    "family": "Oreo",
+    "source": "costazul",
+    "source_ref": "55068",
+    "url": "https://costazul.sigo.com.ve/galleta-rellena-oreo-americano-6s-192g",
+    "expected_name": "Galleta Rellena Oreo Americana 6Sobres 192g",
+    "brand": "Oreo Americana",
+    "expected_price": "$2.20"
+  },
+  {
+    "family": "Oreo",
+    "source": "costazul",
+    "source_ref": "55067",
+    "url": "https://costazul.sigo.com.ve/galleta-rellena-oreo-chocolate-6s-192g",
+    "expected_name": "Galleta Rellena Oreo Chocolate 6s 192g",
+    "brand": "Oreo Americana",
+    "expected_price": "$2.20"
+  },
+  {
+    "family": "Oreo",
+    "source": "costazul",
+    "source_ref": "55069",
+    "url": "https://costazul.sigo.com.ve/galleta-rellena-oreo-americana-96gr",
+    "expected_name": "Galleta Rellena Oreo Americana 96Gr",
+    "brand": "Oreo Americana",
+    "expected_price": "$1.15"
+  }
+]
