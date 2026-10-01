@@ -111,8 +111,9 @@ Añade en `backend/config/urls.py`:
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import FileResponse, HttpResponse, JsonResponse
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.views.decorators.cache import never_cache
+from django.views.static import serve
 
 DIST_DIR = settings.BASE_DIR.parent / 'frontend' / 'dist'
 
@@ -141,18 +142,37 @@ urlpatterns = [
     path('api/', include('customers.urls')),
     path('api/', include('sales.urls')),
     path('assets/<path:ruta>', assets, name='assets'),
-    path('', spa, name='spa'),
+    # El grupo debe llamarse `path`: es el keyword que espera `serve`.
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    re_path(r'^(?!api/|admin/|assets/|media/|static/).*$', spa, name='spa'),
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 ```
 
-> **Cuidado:** la ruta `''` (catch-all) debe ir al final y sirve `index.html` para
-> cualquier ruta no API, para que React Router funcione. En producción `media`
-> se sirve por `whitenoise` o por un servicio de almacenamiento; si no, las fotos
-> no cargarán. La solución mínima es [whitenoise con `STORAGES`](https://whitenoise.readthedocs.io/);
-> para algo real, usa un bucket S3/R2 o el disco persistente de la sección 5.
+> **Dos trampas verificadas en esta app, no adivinadas:**
+>
+> 1. **`path('', spa)` NO es un catch-all.** Solo matchea el resto vacío, así que
+>    la raíz carga pero `/ventas`, `/productos` o `/creditos` devuelven 404 y
+>    React Router no arranca al recargar. Hace falta una expresión regular como
+>    la de arriba. El negativo `(?!api/|admin/|...)` mantiene los 404 de la API
+>    como JSON en vez de devolverles el `index.html`.
+> 2. **WhiteNoise no puede servir `media/`.** `WHITENOISE_ROOT` se monta en `/`
+>    sin prefijo (en `whitenoise/middleware.py`, `add_files(root)` va sin
+>    argumento `prefix`), de modo que las fotos responderían en
+>    `/products/1/xxx.webp` en lugar de `/media/products/1/xxx.webp` y se
+>    rompería cada URL ya guardada. Por eso `media` va con una ruta explícita
+>    sobre `django.views.static.serve`, que sí funciona con `DEBUG=False`.
+>    WhiteNoise queda a cargo de `STATIC_ROOT` (el bundle de Vite), que es lo
+>    que resuelve bien.
+>
+> Sobre la vista `assets`: compara la ruta resuelta contra la raíz del build, así
+> que un `../..` no lee archivos de fuera. Conviene comprobarlo antes de
+> desplegar (`backend/tools/` no lo cubre todavía).
+>
+> Para algo real, mueve `media` a un bucket S3/R2 o al disco persistente de la
+> sección 5.
 
 ### 2.3 Variables de entorno
 
@@ -166,6 +186,29 @@ Render inyecta variables directamente (python-dotenv no las necesita ahí, el
 | `DJANGO_SECRET_KEY` | Valor fuerte (no el de `.env`) |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://TU-NOMBRE.onrender.com` |
 | `MAYU_DEMO_PASSWORD` | Contraseña propia (nunca `mayu1234` en producción) |
+
+### 2.4 Cómo viaja la data a la demo
+
+El disco de Render es efímero, así que el build arranca de cero. Para esta demo
+se versionan a propósito `backend/db.sqlite3` y `backend/media/` (las dos líneas
+están comentadas en `.gitignore`). El build solo hace `migrate` + `collectstatic`
+sobre esa copia: **no se corren los `seed_*`**, porque la copia ya los tiene
+aplicados y `seed_demo` volvería a insertar artículos de prueba.
+
+Dos advertencias que solo aparecen al versionar la base:
+
+- **Los tokens de DRF no dependen del `SECRET_KEY`.** Render genera una clave
+  nueva en cada despliegue, pero los tokens que viajan dentro de `db.sqlite3`
+  seguirían dando acceso a la API pública. Límpialos antes de commitear:
+  `..\.venv\Scripts\python.exe backend\tools\purge_api_tokens.py --apply`
+- **Los hashes de contraseña también viajan.** Hoy son usuarios de prueba
+  (`admin`, `gerente`, `almacenero`, `cajero`, todos con la misma contraseña de
+  demostración). Antes de usar esto con una bodega real, deja de versionarse la
+  base y pasa a la sección 5.
+
+> Por qué no hay `MAYU_DEMO_PASSWORD` en `render.yaml`: los usuarios ya vienen
+> creados dentro de la base versionada, así que la contraseña se cambia en el
+> panel de admin, no por variable de entorno.
 
 ---
 
@@ -266,11 +309,18 @@ el flujo de deploy:
 
 ## Checklist final
 
-- [ ] Repo con remoto en GitHub, rama `main`, todo commiteado.
-- [ ] `render.yaml` creado y `gunicorn` en `backend/requirements.txt`.
-- [ ] `urls.py` sirve SPA + assets + media en producción.
-- [ ] Build local pasa (`npm.cmd run build`, `collectstatic`).
-- [ ] Variables de entorno puestas en Render (`SECRET_KEY`, `MAYU_DEMO_PASSWORD`, etc.).
-- [ ] **Respaldo de `db.sqlite3` + `media` ANTES de cada push** que dispare redeploy.
+- [x] Repo con remoto en GitHub, rama `main`, todo commiteado.
+- [x] `render.yaml` creado y `gunicorn` + `whitenoise` en `backend/requirements.txt`.
+- [x] `urls.py` sirve SPA + assets + media en producción, con `DEBUG=False`
+      verificado en local: `/`, `/ventas`, `/productos`, `/vender`, `/creditos` y
+      `/ajustes` devuelven 200; la API conserva el JSON en sus 401; 10 fotos
+      reales de la API devuelven 200 `image/webp`; el traversal a `db.sqlite3` o
+      `.env` no filtra nada.
+- [x] Build local pasa (`npm.cmd run build`, `collectstatic`, `manage.py check`,
+      156 tests, `npm.cmd run lint`).
+- [x] `db.sqlite3` y `backend/media/` versionados para que la demo arranque con
+      contenido, y tokens de API purgados antes del push.
+- [ ] Blueprint aplicado en Render y variables de entorno confirmadas.
 - [ ] Verificado login + página principal después del deploy.
+- [ ] Cambiar la contraseña de `mayu1234` antes de enseñar la URL.
 - [ ] Decidido el camino de persistencia real (Postgres o Disco).
