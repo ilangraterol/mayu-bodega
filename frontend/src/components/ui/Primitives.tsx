@@ -55,19 +55,45 @@ export function StatusBadge({ status }: { status: string }) {
   return <Badge tone={entry.tone}>{entry.label}</Badge>
 }
 
-/** Stock pill that also surfaces the pending (shortage) balance. */
-export function StockBadge({ stock, pending }: { stock: string; pending?: string }) {
+/**
+ * Stock pill that also surfaces the pending (shortage) balance.
+ *
+ * `compact` swaps the words for the bare number so the till grid can show the
+ * real stock figure ("0" instead of "Agotado") in a fraction of the width; the
+ * wording is kept everywhere else, where there is room to read it.
+ */
+export function StockBadge({
+  stock,
+  pending,
+  compact = false,
+}: {
+  stock: string
+  pending?: string
+  compact?: boolean
+}) {
   const stockValue = parseMoney(stock)
   const pendingValue = parseMoney(pending ?? '0')
   if (pendingValue > 0) {
     return (
       <Badge tone="danger">
-        0 · debe {pendingValue}
+        {compact ? `0 · ${pendingValue}` : `0 · debe ${pendingValue}`}
       </Badge>
     )
   }
-  if (stockValue <= 0) return <Badge tone="danger">Agotado</Badge>
-  if (stockValue < 1) return <Badge tone="warning">Últimas</Badge>
+  if (stockValue <= 0) {
+    return (
+      <Badge tone="danger">
+        {compact ? '0' : 'Agotado'}
+      </Badge>
+    )
+  }
+  if (stockValue < 1) {
+    return (
+      <Badge tone="warning">
+        {compact ? '<1' : 'Últimas'}
+      </Badge>
+    )
+  }
   return <Badge tone="neutral">{stockValue}</Badge>
 }
 

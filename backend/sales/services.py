@@ -3,6 +3,9 @@
 Rules implemented here (never in views or serializers):
 
 * a sale freezes the BCV rate, the surcharge percentage and the unit prices;
+* the surcharge is resolved **per line** (article > category > store) and can be
+  overridden by the cashier at the till, which also becomes the article's new
+  value so the next sale starts from it;
 * stock is deducted atomically, and blocked when it is insufficient unless the
   store allows billing with zero stock;
 * a credit sale requires a customer and opens a debt denominated in USD;
@@ -18,6 +21,11 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from catalog.surcharge import (
+    SURCHARGE_SOURCE_MANUAL,
+    coerce_surcharge,
+    resolve_surcharge,
+)
 from core.enums import CURRENCY_USD, CURRENCY_VES
 from core.money import quantize_money, quantize_quantity, usd_to_ves, ves_to_usd
 from core.models import StoreConfig
@@ -39,28 +47,66 @@ from sales.models import (
 logger = logging.getLogger(__name__)
 
 ZERO = Decimal('0.00')
+_HUNDRED = Decimal('100')
 
 
 class OutOfStockError(ValidationError):
     pass
 
 
-def compute_totals(lines: list[dict], surcharge_percentage: Decimal) -> dict:
-    """``lines`` -> ``[{'product_id', 'quantity', 'unit_price_usd'}]``."""
+def compute_line(line: dict, surcharge_percentage) -> dict:
+    """Apply one line's own surcharge and return it with its amounts frozen.
+
+    The surcharge only ever multiplies this line's own total, which is what
+    keeps a 30% article from inflating a 10% one sold in the same ticket.
+    """
+    line_total = quantize_money(quantize_quantity(line['quantity']) * quantize_money(line['unit_price_usd']))
+    percentage = coerce_surcharge(surcharge_percentage)
+    surcharge = quantize_money(line_total * (percentage / _HUNDRED))
+    return {
+        **line,
+        'line_total_usd': line_total,
+        'surcharge_percentage': percentage,
+        'surcharge_usd': surcharge,
+        'total_with_surcharge_usd': quantize_money(line_total + surcharge),
+    }
+
+
+def compute_totals(computed_lines: list[dict]) -> dict:
+    """Sum already-computed lines into the sale totals.
+
+    ``surcharge_percentage`` on the result is the *effective* rate, the one
+    weighted by each line's amount. It is what reproduces the old single
+    percentage for legacy sales and keeps the field meaningful for per-line
+    ones.
+    """
     subtotal = ZERO
-    for line in lines:
-        line_total = quantize_quantity(line['quantity']) * quantize_money(line['unit_price_usd'])
-        subtotal = quantize_money(subtotal + line_total)
-    surcharge = quantize_money(subtotal * (quantize_money(surcharge_percentage) / Decimal('100')))
+    surcharge = ZERO
+    for line in computed_lines:
+        subtotal = quantize_money(subtotal + line['line_total_usd'])
+        surcharge = quantize_money(surcharge + line['surcharge_usd'])
+
+    if subtotal > ZERO:
+        effective = quantize_money(surcharge / subtotal * _HUNDRED)
+    else:
+        effective = ZERO
+
     return {
         'subtotal_usd': subtotal,
         'surcharge_usd': surcharge,
         'total_usd': quantize_money(subtotal + surcharge),
+        'surcharge_percentage': effective,
     }
 
 
-def _resolve_lines(items: list[dict]) -> list[dict]:
-    """Validate every line and fall back to the catalogue price when not given."""
+def _resolve_lines(items: list[dict], *, store_default) -> list[dict]:
+    """Validate every line, resolve prices and resolve the surcharge per line.
+
+    ``items`` entries are ``{'product_id', 'quantity', 'unit_price_usd'?,
+    'surcharge_percentage'?}``. A missing surcharge falls through to the
+    catalogue (article > category > store); a supplied one must be within
+    [0, 100] and is flagged when it differs from the catalogue value.
+    """
     from catalog.models import Product
 
     normalized = []
@@ -84,11 +130,25 @@ def _resolve_lines(items: list[dict]) -> list[dict]:
         if unit_price < 0:
             raise ValidationError('El precio no puede ser negativo.')
 
+        catalogue_percentage, source = resolve_surcharge(product, store_default)
+        requested = raw.get('surcharge_percentage')
+        if requested is None:
+            percentage, source = catalogue_percentage, source
+            overrides_catalogue = False
+        else:
+            percentage = coerce_surcharge(requested)
+            overrides_catalogue = percentage != catalogue_percentage
+            source = SURCHARGE_SOURCE_MANUAL
+
         normalized.append(
             {
                 'product_id': product.pk,
                 'quantity': quantity,
                 'unit_price_usd': unit_price,
+                'surcharge_percentage': percentage,
+                'surcharge_source': source,
+                'overrides_catalogue': overrides_catalogue,
+                'catalogue_percentage': catalogue_percentage,
                 'product': product,
             }
         )
@@ -121,11 +181,11 @@ def create_sale(
 
     config = StoreConfig.load()
     rate = get_current_rate().rate
-    surcharge_percentage = quantize_money(config.default_surcharge_percentage)
     sale_date = sale_date or timezone.localdate()
 
-    normalized = _resolve_lines(items)
-    totals = compute_totals(normalized, surcharge_percentage)
+    normalized = _resolve_lines(items, store_default=config.default_surcharge_percentage)
+    computed = [compute_line(line, line['surcharge_percentage']) for line in normalized]
+    totals = compute_totals(computed)
 
     sale = Sale.objects.create(
         sale_type=sale_type,
@@ -133,7 +193,7 @@ def create_sale(
         sale_date=sale_date,
         currency=currency,
         exchange_rate_applied=rate,
-        surcharge_percentage=surcharge_percentage,
+        surcharge_percentage=totals['surcharge_percentage'],
         subtotal_usd=totals['subtotal_usd'],
         surcharge_usd=totals['surcharge_usd'],
         total_usd=totals['total_usd'],
@@ -143,9 +203,8 @@ def create_sale(
         created_by=user,
     )
 
-    for line in normalized:
+    for line, amounts in zip(normalized, computed):
         product = _lock_product(line['product_id'])
-        line_total = quantize_money(line['quantity'] * line['unit_price_usd'])
 
         if not config.allow_zero_stock_sale and (product.stock or ZERO) < line['quantity']:
             raise OutOfStockError(
@@ -153,12 +212,18 @@ def create_sale(
                 f'Disponible: {product.stock}, solicitado: {line["quantity"]}.'
             )
 
+        if line['overrides_catalogue']:
+            _persist_surcharge(product, line, user=user)
+
         SaleItem.objects.create(
             sale=sale,
             product=product,
             quantity=line['quantity'],
             unit_price_usd=line['unit_price_usd'],
-            line_total_usd=line_total,
+            line_total_usd=amounts['line_total_usd'],
+            surcharge_percentage=line['surcharge_percentage'],
+            surcharge_usd=amounts['surcharge_usd'],
+            surcharge_source=line['surcharge_source'],
             unit_cost_usd=product.cost_usd,
         )
 
@@ -177,6 +242,23 @@ def create_sale(
 
     _settle_sale(sale=sale, paid_amount=paid_amount, currency=currency)
     return sale
+
+
+def _persist_surcharge(product, line: dict, *, user) -> None:
+    """Store the percentage the cashier chose as the article's new surcharge.
+
+    A change made at the till is meant to stick: the next ticket on the same
+    article must start from the number the cashier just confirmed. The row is
+    already locked by the caller, so this write is serialized with other sales.
+    """
+    product.surcharge_percentage = line['surcharge_percentage']
+    product.save(update_fields=['surcharge_percentage', 'updated_at'])
+    logger.info(
+        'Recargo del artículo %s actualizado a %s%% por %s durante la venta.',
+        product.code,
+        line['surcharge_percentage'],
+        user,
+    )
 
 
 def _lock_product(product_id):

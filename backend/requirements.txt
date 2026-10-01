@@ -4,3 +4,7 @@ django-filter==26.1
 pillow==12.3.0
 python-dotenv==1.2.3
 requests==2.34.2
+# Production only: `runserver` is not a WSGI server, and Django stops serving
+# media/static with DEBUG=False, which is how Render runs it.
+gunicorn==23.0.0
+whitenoise==6.11.0

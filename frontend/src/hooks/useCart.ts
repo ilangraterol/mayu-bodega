@@ -10,11 +10,23 @@
 import { useCallback, useMemo, useReducer } from 'react'
 
 import { parseMoney, roundQuantity, toQuantityString } from '../lib/money'
-import type { Product, SaleItemInput } from '../types/api'
+import type { Product, SaleItemInput, SurchargeSource } from '../types/api'
 
+/**
+ * A line keeps the percentage the cashier settled on. It starts at whatever the
+ * catalogue resolves (article > category > store) and is only sent to the
+ * server once the cashier actually edits it, so confirming a value that matches
+ * the catalogue never pins it onto the article.
+ */
 export interface CartLine {
   product: Product
   quantity: number
+  /** `null` means "not chosen yet": the server resolves it from the catalogue. */
+  surchargePercentage: number | null
+  /** The percentage the catalogue resolves, used to pre-fill and to reset. */
+  inheritedPercentage: number
+  /** Why the inherited value is what it is, shown next to the picker. */
+  inheritedSource: SurchargeSource
 }
 
 type Action =
@@ -22,15 +34,29 @@ type Action =
   | { type: 'increment'; productId: number }
   | { type: 'decrement'; productId: number }
   | { type: 'setQuantity'; productId: number; quantity: number }
+  | { type: 'setSurcharge'; productId: number; percentage: number | null }
   | { type: 'remove'; productId: number }
   | { type: 'clear' }
+
+function inheritedOf(product: Product): number {
+  return parseMoney(product.effective_surcharge_percentage ?? '0')
+}
 
 function reducer(state: CartLine[], action: Action): CartLine[] {
   switch (action.type) {
     case 'add': {
       const existing = state.find((line) => line.product.id === action.product.id)
       if (!existing) {
-        return [...state, { product: action.product, quantity: action.quantity ?? 1 }]
+        return [
+          ...state,
+          {
+            product: action.product,
+            quantity: action.quantity ?? 1,
+            surchargePercentage: null,
+            inheritedPercentage: inheritedOf(action.product),
+            inheritedSource: action.product.surcharge_source,
+          },
+        ]
       }
       return state.map((line) =>
         line.product.id === action.product.id
@@ -56,6 +82,12 @@ function reducer(state: CartLine[], action: Action): CartLine[] {
           ? { ...line, quantity: roundQuantity(Math.max(0, action.quantity)) }
           : line,
       )
+    case 'setSurcharge':
+      return state.map((line) =>
+        line.product.id === action.productId
+          ? { ...line, surchargePercentage: action.percentage }
+          : line,
+      )
     case 'remove':
       return state.filter((line) => line.product.id !== action.productId)
     case 'clear':
@@ -71,6 +103,12 @@ export interface CartApi {
   increment: (productId: number) => void
   decrement: (productId: number) => void
   setQuantity: (productId: number, quantity: number) => void
+  /** The percentage this line will be charged at, chosen or inherited. */
+  surchargeOf: (productId: number) => number
+  /** `null` hands the decision back to the catalogue. */
+  setSurcharge: (productId: number, percentage: number | null) => void
+  /** How many lines carry a percentage the cashier chose. */
+  customisedCount: number
   remove: (productId: number) => void
   clear: () => void
   isEmpty: boolean
@@ -102,6 +140,11 @@ export function useCart(): CartApi {
       dispatch({ type: 'setQuantity', productId, quantity }),
     [],
   )
+  const setSurcharge = useCallback(
+    (productId: number, percentage: number | null) =>
+      dispatch({ type: 'setSurcharge', productId, percentage }),
+    [],
+  )
   const remove = useCallback(
     (productId: number) => dispatch({ type: 'remove', productId }),
     [],
@@ -110,6 +153,14 @@ export function useCart(): CartApi {
 
   const quantityOf = useCallback(
     (productId: number) => lines.find((line) => line.product.id === productId)?.quantity ?? 0,
+    [lines],
+  )
+
+  const surchargeOf = useCallback(
+    (productId: number) => {
+      const line = lines.find((entry) => entry.product.id === productId)
+      return line?.surchargePercentage ?? line?.inheritedPercentage ?? 0
+    },
     [lines],
   )
 
@@ -124,7 +175,8 @@ export function useCart(): CartApi {
     const hasShortage = lines.some(
       (line) => line.quantity > parseMoney(line.product.stock),
     )
-    return { count, estimatedSubtotalUsd, hasShortage }
+    const customisedCount = lines.filter((line) => line.surchargePercentage !== null).length
+    return { count, estimatedSubtotalUsd, hasShortage, customisedCount }
   }, [lines])
 
   const toPayload = useCallback(
@@ -134,6 +186,12 @@ export function useCart(): CartApi {
         .map((line) => ({
           product_id: line.product.id,
           quantity: toQuantityString(line.quantity),
+          // Only a deliberate choice travels. Omitting it lets the backend keep
+          // resolving the catalogue, which is what avoids pinning a value that
+          // merely happened to match.
+          ...(line.surchargePercentage === null
+            ? {}
+            : { surcharge_percentage: String(line.surchargePercentage) }),
         })),
     [lines],
   )
@@ -145,6 +203,9 @@ export function useCart(): CartApi {
     increment,
     decrement,
     setQuantity,
+    surchargeOf,
+    setSurcharge,
+    customisedCount: derived.customisedCount,
     remove,
     clear,
     isEmpty: lines.length === 0,

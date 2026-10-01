@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
+import { CategoryChips } from '../components/catalog/CategoryChips'
 import { ProductImage } from '../components/products/ProductImage'
 import { ProductImages } from '../components/products/ProductImages'
 import { Button } from '../components/ui/Button'
@@ -10,6 +11,7 @@ import { ListSkeleton } from '../components/ui/Skeleton'
 import { Badge, Card } from '../components/ui/Primitives'
 import { Sheet } from '../components/ui/Sheet'
 import { useProduct, useProducts, useUpdateProduct } from '../hooks/useProducts'
+import { useCategoryOptions } from '../hooks/useCategories'
 import { NumberInput, Select, TextInput as Input, Toggle } from '../components/ui/Field'
 import { UNIT_OPTIONS, UNIT_LABELS } from '../lib/labels'
 import { formatQuantity, formatUsd } from '../lib/money'
@@ -20,10 +22,14 @@ export function ProductsPage() {
   const [search, setSearch] = useState('')
   const [lowOnly, setLowOnly] = useState(params.get('low') === '1')
   const [editing, setEditing] = useState<number | null>(null)
+  const [category, setCategory] = useState<number | null>(null)
+
+  const categories = useCategoryOptions()
 
   const products = useProducts({
     search: search.trim() || undefined,
     lowStock: lowOnly,
+    category,
     pageSize: 50,
   })
 
@@ -65,6 +71,12 @@ export function ProductsPage() {
           Stock bajo
         </button>
       </div>
+
+      <CategoryChips
+        categories={categories.data?.results ?? []}
+        value={category}
+        onChange={setCategory}
+      />
 
       {products.isLoading ? (
         <Card>
@@ -160,6 +172,9 @@ function toForm(product: Product): ProductPayload {
     name: product.name,
     barcode: product.barcode,
     brand: product.brand,
+    category: product.category,
+    // Empty means "inherit": the category value, or the store default.
+    surcharge_percentage: product.surcharge_percentage ?? '',
     unit_of_measure: product.unit_of_measure,
     units_per_package: product.units_per_package,
     cost_usd: product.cost_usd,
@@ -171,12 +186,24 @@ function toForm(product: Product): ProductPayload {
 
 function ProductForm({ product }: { product: Product }) {
   const update = useUpdateProduct(product.id)
+  const categories = useCategoryOptions()
   // Initialized directly from the record: no effect, no cascading render.
   const [form, setForm] = useState<ProductPayload>(() => toForm(product))
 
   async function onSave() {
-    await update.mutate(form).catch(() => undefined)
+    // A blank field is "inherit", which the API stores as null.
+    const payload: ProductPayload = {
+      ...form,
+      category: form.category ?? null,
+      surcharge_percentage: form.surcharge_percentage === '' ? null : form.surcharge_percentage,
+    }
+    await update.mutate(payload).catch(() => undefined)
   }
+
+  const categoryOptions = (categories.data?.results ?? []).map((category) => ({
+    value: String(category.id),
+    label: `${category.name} · ${category.surcharge_percentage_display}`,
+  }))
 
   return (
     <>
@@ -216,6 +243,29 @@ function ProductForm({ product }: { product: Product }) {
           label="Marca"
           value={form.brand}
           onChange={(event) => setForm({ ...form, brand: event.target.value })}
+        />
+        <Select
+          label="Categoría"
+          hint="Aporta el recargo por defecto de sus artículos."
+          value={form.category === null || form.category === undefined ? '' : String(form.category)}
+          onChange={(event) =>
+            setForm({ ...form, category: event.target.value ? Number(event.target.value) : null })
+          }
+          options={categoryOptions}
+          placeholder="Sin categoría (hereda de la tienda)"
+        />
+        <NumberInput
+          label="Recargo propio (%)"
+          hint={
+            form.surcharge_percentage === '' || form.surcharge_percentage === null
+              ? `Heredado · ahora ${product.effective_surcharge_percentage}% (${product.surcharge_source_display})`
+              : 'Fija el recargo de este artículo sobre el de la categoría.'
+          }
+          min="0"
+          max="100"
+          step="0.01"
+          value={form.surcharge_percentage ?? ''}
+          onChange={(event) => setForm({ ...form, surcharge_percentage: event.target.value })}
         />
         <Select
           label="Unidad de medida"

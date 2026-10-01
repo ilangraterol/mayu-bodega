@@ -14,6 +14,11 @@ from django.db import models
 
 from core.enums import CURRENCY_CHOICES, CURRENCY_USD
 from core.money import MONEY_PLACES, QUANTITY_PLACES, RATE_PLACES
+from catalog.surcharge import (
+    SURCHARGE_MAX_PERCENT,
+    SURCHARGE_SOURCE_CHOICES,
+    SURCHARGE_SOURCE_STORE,
+)
 
 
 class SaleType(models.TextChoices):
@@ -61,7 +66,11 @@ class Sale(models.Model):
         max_digits=6,
         decimal_places=2,
         default=Decimal('0.00'),
-        help_text='Recargo aplicado (%), copiado de la configuración en el momento de la venta.',
+        help_text=(
+            'Recargo efectivo de la venta, como porcentaje ponderado por el importe de cada '
+            'línea (surge_usd / subtotal_usd * 100). Las ventas anteriores al recargo por '
+            'línea guardaban aquí un único porcentaje global; el valor sigue siendo válido.'
+        ),
     )
     subtotal_usd = models.DecimalField(max_digits=14, decimal_places=MONEY_PLACES, default=Decimal('0.00'))
     surcharge_usd = models.DecimalField(max_digits=14, decimal_places=MONEY_PLACES, default=Decimal('0.00'))
@@ -134,6 +143,24 @@ class SaleItem(models.Model):
     )
     unit_price_usd = models.DecimalField(max_digits=12, decimal_places=MONEY_PLACES)
     line_total_usd = models.DecimalField(max_digits=14, decimal_places=MONEY_PLACES)
+    surcharge_percentage = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text='Recargo congelado en esta línea, ya sea del artículo, de su categoría, de la tienda o elegido en el carrito.',
+    )
+    surcharge_usd = models.DecimalField(
+        max_digits=14,
+        decimal_places=MONEY_PLACES,
+        default=Decimal('0.00'),
+        help_text='Importe del recargo de la línea, calculado sobre line_total_usd.',
+    )
+    surcharge_source = models.CharField(
+        max_length=10,
+        choices=SURCHARGE_SOURCE_CHOICES,
+        default=SURCHARGE_SOURCE_STORE,
+        help_text='Nivel del que salió el recargo aplicado en esta línea.',
+    )
     unit_cost_usd = models.DecimalField(
         max_digits=12, decimal_places=MONEY_PLACES, help_text='Costo congelado al momento de la venta.'
     )
@@ -144,6 +171,14 @@ class SaleItem(models.Model):
             models.CheckConstraint(condition=models.Q(quantity__gt=0), name='sale_item_quantity_gt_0'),
             models.CheckConstraint(
                 condition=models.Q(unit_price_usd__gte=0), name='sale_item_unit_price_gte_0'
+            ),
+            models.CheckConstraint(
+                condition=models.Q(surcharge_usd__gte=0), name='sale_item_surcharge_gte_0'
+            ),
+            models.CheckConstraint(
+                condition=models.Q(surcharge_percentage__gte=0)
+                & models.Q(surcharge_percentage__lte=SURCHARGE_MAX_PERCENT),
+                name='sale_item_surcharge_between_0_and_100',
             ),
         ]
 

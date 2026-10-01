@@ -59,6 +59,24 @@ export function formatUsd(value: string | number | null | undefined): string {
   return usdFormatter.format(parseMoney(value))
 }
 
+/**
+ * `USD 1.234,56` spelled out, which is the clear choice in totals and reports but
+ * costs three characters of a phone-width price. The till grid uses this instead:
+ * `narrowSymbol` renders `$1.234,56` in es-VE, and it is scoped here so the
+ * unambiguous label survives everywhere else.
+ */
+const usdCompactFormatter = new Intl.NumberFormat('es-VE', {
+  style: 'currency',
+  currency: 'USD',
+  currencyDisplay: 'narrowSymbol',
+  minimumFractionDigits: MONEY_PLACES,
+  maximumFractionDigits: MONEY_PLACES,
+})
+
+export function formatUsdCompact(value: string | number | null | undefined): string {
+  return usdCompactFormatter.format(parseMoney(value))
+}
+
 export function formatVes(value: string | number | null | undefined): string {
   return vesFormatter.format(parseMoney(value))
 }
@@ -91,4 +109,10 @@ export function formatQuantity(value: string | number | null | undefined): strin
   const parsed = parseMoney(value)
   const rounded = roundQuantity(parsed)
   return new Intl.NumberFormat('es-VE', { maximumFractionDigits: QUANTITY_PLACES }).format(rounded)
+}
+
+/** A percentage without trailing zeros: "5.00" reads as "5%". */
+export function formatPercent(value: string | number | null | undefined): string {
+  const rounded = roundMoney(parseMoney(value), 2)
+  return `${Number(rounded.toFixed(2))}%`
 }

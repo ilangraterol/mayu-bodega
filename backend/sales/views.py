@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from catalog.models import Product
+from catalog.surcharge import SURCHARGE_PRESET_VALUES, surcharge_label
 from core.money import quantize_money, usd_to_ves
 from core.models import StoreConfig
 from core.permissions import CanAccessResource
@@ -26,7 +27,11 @@ from sales.serializers import (
 
 
 def _build_lines(raw_items: list[dict]) -> list[dict]:
-    """Resolve catalogue prices for the lines that do not carry an explicit price."""
+    """Resolve catalogue prices for the lines that do not carry an explicit price.
+
+    The cashier's ``surcharge_percentage`` travels untouched: the service layer
+    decides whether it is valid and whether it differs from the catalogue.
+    """
     lines = []
     for raw in raw_items:
         product = Product.objects.filter(pk=raw['product_id']).first()
@@ -38,6 +43,7 @@ def _build_lines(raw_items: list[dict]) -> list[dict]:
                 'product_id': product.pk,
                 'quantity': raw['quantity'],
                 'unit_price_usd': product.price_usd if unit_price is None else unit_price,
+                'surcharge_percentage': raw.get('surcharge_percentage'),
             }
         )
     return lines
@@ -97,7 +103,12 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='quote')
     def quote(self, request):
-        """Preview cart totals with the current rate and the configured surcharge."""
+        """Preview cart totals with the current rate and the per-line surcharge.
+
+        Each line resolves its own surcharge (article > category > store) and may
+        carry the percentage the cashier chose, which is validated here exactly
+        as it is on the real sale. A quote never writes anything.
+        """
         serializer = QuoteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -109,25 +120,24 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         config = StoreConfig.load()
+        resolved = services._resolve_lines(
+            serializer.validated_data['items'], store_default=config.default_surcharge_percentage
+        )
+
         lines = []
-        for raw in serializer.validated_data['items']:
-            product = Product.objects.filter(pk=raw['product_id']).first()
-            if product is None:
-                return Response({'detail': 'Artículo no encontrado.'}, status=status.HTTP_400_BAD_REQUEST)
-            unit_price = product.price_usd if raw.get('unit_price_usd') is None else raw['unit_price_usd']
+        for line in resolved:
+            amounts = services.compute_line(line, line['surcharge_percentage'])
+            product = line['product']
             lines.append(
                 {
-                    'product_id': product.pk,
+                    **amounts,
                     'product_code': product.code,
                     'product_name': product.name,
-                    'quantity': raw['quantity'],
-                    'unit_price_usd': unit_price,
                     'stock': product.stock,
-                    'line_total_usd': quantize_money(raw['quantity'] * unit_price),
                 }
             )
 
-        totals = services.compute_totals(lines, config.default_surcharge_percentage)
+        totals = services.compute_totals(lines)
         return Response(
             {
                 'subtotal_usd': str(totals['subtotal_usd']),
@@ -136,17 +146,25 @@ class SaleViewSet(viewsets.ReadOnlyModelViewSet):
                 'total_ves': str(usd_to_ves(totals['total_usd'], rate.rate)),
                 'exchange_rate_applied': str(rate.rate),
                 'rate_effective_date': rate.effective_date,
-                'surcharge_percentage': str(config.default_surcharge_percentage),
+                'surcharge_percentage': str(totals['surcharge_percentage']),
+                'surcharge_presets': SURCHARGE_PRESET_VALUES,
                 'allow_zero_stock_sale': config.allow_zero_stock_sale,
                 'lines': [
                     {
-                        **line,
-                        # Every decimal travels as a string: the client must never
-                        # parse money or quantities as floats.
-                        'stock': str(line['stock']),
+                        'product_id': line['product_id'],
+                        'product_code': line['product_code'],
+                        'product_name': line['product_name'],
                         'quantity': str(line['quantity']),
                         'unit_price_usd': str(line['unit_price_usd']),
                         'line_total_usd': str(line['line_total_usd']),
+                        'surcharge_percentage': str(line['surcharge_percentage']),
+                        'surcharge_usd': str(line['surcharge_usd']),
+                        'total_with_surcharge_usd': str(line['total_with_surcharge_usd']),
+                        'surcharge_source': line['surcharge_source'],
+                        'surcharge_source_display': surcharge_label(line['surcharge_source']),
+                        # Every decimal travels as a string: the client must never
+                        # parse money or quantities as floats.
+                        'stock': str(line['stock']),
                     }
                     for line in lines
                 ],

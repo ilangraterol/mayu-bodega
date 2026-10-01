@@ -57,8 +57,10 @@ export function CheckoutSheet({ open, onClose, quote, items, onDone }: CheckoutS
   if (!open || !quote) return null
 
   // A different cart remounts the form, so no field leaks into the next sale.
+  // The surcharge is part of the key: changing a line's percentage changes the
+  // total, and the amount received has to fall back to the new default.
   const cartKey = `${items.length}:${items
-    .map((item) => `${item.product_id}-${item.quantity}`)
+    .map((item) => `${item.product_id}-${item.quantity}-${item.surcharge_percentage ?? 'auto'}`)
     .join(',')}`
 
   return (

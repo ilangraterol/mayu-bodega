@@ -36,17 +36,41 @@ export function formatDateTime(value: string | null | undefined): string {
   }).format(date)
 }
 
-/** `29/08/2026 11:00 am`. Built by hand: `Intl` with `es-VE` writes `a. m.`. */
+/** The 12-hour clock, built by hand because `Intl` with `es-VE` writes `a. m.`. */
+function amPm(date: Date, { padHours }: { padHours: boolean }): string {
+  const hours24 = date.getHours()
+  const hours12 = String(hours24 % 12 === 0 ? 12 : hours24 % 12)
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const suffix = hours24 < 12 ? 'am' : 'pm'
+  return `${padHours ? hours12.padStart(2, '0') : hours12}:${minutes} ${suffix}`
+}
+
+function dayMonthYear(date: Date): string {
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${day}/${month}/${date.getFullYear()}`
+}
+
+/** `29/08/2026 11:00 am`. */
 export function formatDateTimeAmPm(value: string | null | undefined): string {
   const date = toDate(value)
   if (!date) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const hours24 = date.getHours()
-  const hours12 = String(hours24 % 12 === 0 ? 12 : hours24 % 12).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  const suffix = hours24 < 12 ? 'am' : 'pm'
-  return `${day}/${month}/${date.getFullYear()} ${hours12}:${minutes} ${suffix}`
+  return `${dayMonthYear(date)} ${amPm(date, { padHours: true })}`
+}
+
+/**
+ * `Lunes 29/09/2026 8:33 am`.
+ *
+ * The weekday comes from `Intl` and is capitalised by hand. The hour is not
+ * zero-padded, unlike `formatDateTimeAmPm`, because this label sits in the header
+ * where the day name already sets the rhythm.
+ */
+export function formatDayDateTime(value: string | null | undefined): string {
+  const date = toDate(value)
+  if (!date) return '—'
+  const weekday = new Intl.DateTimeFormat('es-VE', { weekday: 'long' }).format(date)
+  const capitalised = weekday.charAt(0).toUpperCase() + weekday.slice(1)
+  return `${capitalised} ${dayMonthYear(date)} ${amPm(date, { padHours: false })}`
 }
 
 /** `YYYY-MM-DD` in local time, for `<input type="date">`. */

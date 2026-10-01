@@ -31,6 +31,10 @@ ROLE_INHERITS = {
 
 # Django codename prefixes per app, used to seed groups.
 CATALOG_CODENAMES = [
+    'view_category',
+    'add_category',
+    'change_category',
+    'delete_category',
     'view_product',
     'add_product',
     'change_product',
@@ -83,7 +87,7 @@ ROLE_PERMISSION_CODENAMES = {
     ),
     ROLE_WAREHOUSE: CATALOG_CODENAMES + INVENTORY_CODENAMES,
     ROLE_CASHIER: (
-        ['view_product']
+        ['view_product', 'view_category']
         + ['view_customer', 'add_customer', 'change_customer']
         + [
             'view_sale',

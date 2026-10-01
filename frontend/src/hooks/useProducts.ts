@@ -14,6 +14,8 @@ export interface ProductFilters {
   includeInactive?: boolean
   lowStock?: boolean
   outOfStock?: boolean
+  /** Category id; the API filters on the exact category, not its children. */
+  category?: number | null
   page?: number
   pageSize?: number
 }
@@ -24,6 +26,7 @@ function buildPath(filters: ProductFilters): string {
     include_inactive: filters.includeInactive ? true : undefined,
     low_stock: filters.lowStock ? true : undefined,
     out_of_stock: filters.outOfStock ? true : undefined,
+    category: filters.category ?? undefined,
     page: filters.page,
     page_size: filters.pageSize,
     ordering: 'name',

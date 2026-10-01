@@ -29,6 +29,12 @@ export const endpoints = {
     unitChoices: '/api/products/unit-choices/',
     barcodeLookup: (code: string) => `/api/products/barcode_lookup/${toQuery({ code })}`,
   },
+  categories: {
+    list: (params?: Record<string, string | number | boolean | undefined>) =>
+      `/api/categories/${toQuery(params ?? {})}`,
+    detail: (id: number) => `/api/categories/${id}/`,
+    surchargePresets: '/api/categories/surcharge-presets/',
+  },
   productImages: {
     list: (product: number) => `/api/product-images/${toQuery({ product })}`,
     detail: (id: number) => `/api/product-images/${id}/`,
@@ -91,6 +97,7 @@ export const endpoints = {
 /** Cache key prefixes used by `invalidate()` after a mutation. */
 export const cacheKeys = {
   products: 'products',
+  categories: 'categories',
   productImages: 'product-images',
   rates: 'rates',
   customers: 'customers',

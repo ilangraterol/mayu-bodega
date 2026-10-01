@@ -5,6 +5,7 @@ import { AppLayout } from './components/layout/AppLayout'
 import { useAuth } from './hooks/useAuth'
 import type { Role } from './types/api'
 import { CreditsPage } from './pages/CreditsPage'
+import { CategoriesPage } from './pages/CategoriesPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { ProductsPage } from './pages/ProductsPage'
@@ -72,6 +73,15 @@ export function App() {
           element={
             <Protected roles={['ALMACENERO', 'GERENTE']}>
               <ProductsPage />
+            </Protected>
+          }
+        />
+        {/* Categories share the catalogue permissions, so they sit next to it. */}
+        <Route
+          path="categorias"
+          element={
+            <Protected roles={['ALMACENERO', 'GERENTE']}>
+              <CategoriesPage />
             </Protected>
           }
         />

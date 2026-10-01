@@ -12,6 +12,37 @@
   -webkit-text-size-adjust: 100%;
 }
 
+/*
+  The header holds the identity, the day's sales and the BCV rate with its last
+  update. Two tokens, because they answer different questions:
+
+  - `header` is the height of the content row, so the safe-area padding on a
+    notched phone never squeezes the rate block out of its box.
+  - `header-offset` is how far down the sticky search bar on the point of sale
+    has to start: the content plus the inset above it.
+*/
+@theme {
+  --spacing-header: 52px;
+  --spacing-header-offset: calc(var(--spacing-header) + env(safe-area-inset-top, 0px));
+
+  /*
+    The cart's credit-card icon floats on its own loop so the sell screen reads
+    as alive without needing a motion engine. `motion-reduce` disables it for
+    users who ask for less movement.
+  */
+  --animate-float: float 2.4s ease-in-out infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-3px) rotate(-4deg);
+    }
+  }
+}
+
 html {
   -webkit-tap-highlight-color: transparent;
 }

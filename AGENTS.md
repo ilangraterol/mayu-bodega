@@ -13,7 +13,7 @@ El sistema está diseñado para cumplir con los siguientes objetivos core: 
 * **Gestión de Crédito (Fiado):** Registrar ventas pagadas y ventas fiadas. Cuando un cliente liquide una deuda en bolívares, el sistema debe calcular el monto exacto basado en la tasa del dólar vigente al momento del pago.
 * **Auditoría de Clientes:** Identificar clientes, saldos pendientes y registros históricos de abonos a crédito.
 * **Flexibilidad en Facturación:** Permitir la configuración global (habilitar/deshabilitar) para facturar artículos cuya existencia sea igual a cero (0).
-* **Configuración de Recargos:** Permitir configurar un porcentaje (%) extra por defecto (inicialmente 0%) que se añadirá automáticamente al final de cada venta.
+* **Configuración de Recargos:** El recargo se resuelve por línea con la precedencia `Artículo > Categoría > Tienda`. El porcentaje por defecto de la tienda (inicialmente 0%) actúa como último nivel. Las categorías agrupan artículos y pueden tener un porcentaje compartido; un artículo con valor propio lo reemplaza. El cajero puede ajustar el porcentaje de cada línea en el carrito.
 
 *No amplíes el alcance sin confirmación del usuario.* 
 

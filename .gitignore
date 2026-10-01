@@ -6,12 +6,23 @@ __pycache__/
 venv/
 
 # Django
-db.sqlite3
+# `db.sqlite3` y `backend/media/` SI se versionan a proposito: el disco de Render
+# es efimero, asi que el unico modo de que la demo arranque con catalogo, fotos,
+# clientes y ventas es que viajen en el repo. Contiene datos de prueba, no de
+# clientes reales. Si alguna vez se guardan datos reales aqui, deja de subirse y
+# pasa a respaldarse por fuera (ver DEPLOY.md).
+# db.sqlite3
 db.sqlite3-journal
-backend/media/
+db.sqlite3-wal
+db.sqlite3-shm
+# backend/media/
 backend/staticfiles/
 local_settings.py
 backend/rates/certs/.cache/
+
+# Material local de trabajo: fotos de producto sin procesar, exportaciones y
+# borradores. Son datos del negocio, no código.
+Productos/
 
 # Entorno
 .env

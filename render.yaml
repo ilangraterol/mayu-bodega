@@ -1,0 +1,37 @@
+# Blueprint de despliegue para Mayu Bodega (plan free de Render).
+#
+# Ver DEPLOY.md para el razonamiento. Aviso importante: en plan free el disco es
+# efimero, asi que cualquier venta o imagen subida se pierde en cada redeploy.
+#
+# `db.sqlite3` y `backend/media/` se versionan a proposito (ver .gitignore), de
+# modo que el build parte de una copia del catalogo y las fotos en vez de una
+# base vacia. Por eso aqui NO se corren los seeds: ya estan aplicados dentro de
+# esa copia y `seed_demo` volveria a insertar articulos de prueba.
+services:
+  - type: web
+    name: mayu-bodega
+    runtime: python
+    plan: free
+    buildCommand: |
+      cd backend && pip install -r requirements.txt && \
+      python manage.py migrate && \
+      python manage.py collectstatic --noinput && \
+      cd ../frontend && npm install && npm run build
+    startCommand: cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.14.2"
+      - key: NODE_VERSION
+        value: "22.x"
+      # `runserver` no vale para produccion y Django deja de servir media con
+      # DEBUG en False, de ahi WhiteNoise en settings.py.
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "*"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        value: "https://mayu-bodega.onrender.com"
+      # Render inyecta el puerto, asi que no se fija: declararlo aqui
+      # chocaria con el que Render provee.

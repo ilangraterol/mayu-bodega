@@ -19,10 +19,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <section aria-labelledby="today-heading">
-        <h1 id="today-heading" className="mb-2 text-lg font-semibold text-slate-900">
-          Hoy
-        </h1>
+      <section aria-labelledby="today-heading">    
         {summary.isLoading ? (
           <div className="grid grid-cols-2 gap-2">
             <StatCardSkeleton />

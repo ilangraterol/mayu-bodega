@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from catalog.models import Product, ProductImage
+from catalog.models import Category, Product, ProductImage
 
 
 class ProductImageInline(admin.TabularInline):
@@ -18,11 +18,31 @@ class ProductImageInline(admin.TabularInline):
     preview.short_description = 'Vista previa'
 
 
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ['code', 'name', 'surcharge_percentage', 'is_active']
+    list_filter = ['is_active']
+    search_fields = ['name', 'code']
+    readonly_fields = ['code', 'created_at', 'updated_at']
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['code', 'name', 'brand', 'unit_of_measure', 'stock', 'cost_usd', 'price_usd', 'is_active']
-    list_filter = ['is_active', 'unit_of_measure', 'brand']
+    list_display = [
+        'code',
+        'name',
+        'brand',
+        'category',
+        'surcharge_percentage',
+        'unit_of_measure',
+        'stock',
+        'cost_usd',
+        'price_usd',
+        'is_active',
+    ]
+    list_filter = ['is_active', 'unit_of_measure', 'brand', 'category']
     search_fields = ['name', 'code', 'barcode', 'brand']
+    list_select_related = ['category']
     readonly_fields = ['code', 'stock', 'created_at', 'updated_at']
     inlines = [ProductImageInline]
 

@@ -38,11 +38,15 @@ Variables opcionales:
 | ---------------------------- | --------------------------------------------------------------- | ------- |
 | `check_images.py`            | Auditoría del catálogo: quién tiene foto, filas rotas, principales | no      |
 | `check_urls.py`              | Comprueba que cada foto referenciada responde HTTP 200           | no      |
+| `check_seed_conflicts.py`    | Conflictos que harían fallar `manage.py seed_demo` (códigos de barra, categorías) | no |
+| `restore_seed_names.py`      | Devuelve a los artículos el nombre descriptivo que `seed_demo` acortó | con `--apply` |
 | `inspect_image.py`           | Formato, tamaño, dimensiones y prueba de bloqueo de un archivo   | no      |
 | `test_image_api.py`          | Humo del ciclo completo por HTTP (listar, con `--apply`, crear/borrar) | con `--apply` |
 | `repro_upload.py`            | Sube una foto por la API como lo haría el móvil                  | con `--apply` |
 | `repro_delete.py`            | Borra una foto por la API y verifica que el archivo desaparece    | con `--apply` |
 | `cleanup_image_rows.py`      | Repara filas huérfanas, principales duplicadas y archivos sueltos | con `--apply` |
+| `check_category_filter.py`   | Comprueba que `GET /api/products/?category=<id>` filtra de verdad y cuenta los artículos sin categoría | no      |
+| `purge_api_tokens.py`        | Borra los tokens de DRF antes de subir `db.sqlite3` al repo, para que no den acceso a la API pública | con `--apply` |
 
 `_common.py` no es un script: contiene el arranque de Django, el cliente HTTP y
 los ayudantes de salida que comparten todos los demás.
@@ -56,8 +60,14 @@ los ayudantes de salida que comparten todos los demás.
 # Revisar que nada esté bloqueado en Windows
 ..\.venv\Scripts\python.exe tools\inspect_image.py --product P000011
 
+# Ver por qué fallaría la carga de datos de demostración
+..\.venv\Scripts\python.exe tools\check_seed_conflicts.py
+
 # Reproducir el ciclo completo de subida/baja contra el servidor local
 ..\.venv\Scripts\python.exe tools\test_image_api.py --apply
+
+# Antes de commitear db.sqlite3, deja la base sin tokens de API válidos
+..\.venv\Scripts\python.exe tools\purge_api_tokens.py --apply
 ```
 
 ## Añadir una herramienta nueva

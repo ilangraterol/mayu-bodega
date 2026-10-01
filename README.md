@@ -107,6 +107,16 @@ Los tipos de la API viven en `frontend/src/types/api.ts` y todas las rutas en
 `frontend/src/lib/endpoints.ts`; ese archivo es la fuente de verdad y está
 verificado contra los routers de Django.
 
+### Recargo en el punto de venta
+
+`SurchargePicker` acompaña cada línea del carrito. Se muestra contraído con el
+porcentaje ya resuelto y de dónde salió, así que el caso normal es no tocarlo.
+Al abrirlo aparecen los atajos (`0`, `3`, `5`, `10`, `15`, `30`) y un campo libre
+de `0` a `100%`. Elegir el valor heredado lo devuelve al catálogo, que es como se
+evita fijar un artículo por una simple confirmación. Todo importe que se cobra lo
+calcula el servidor en `POST /api/sales/quote/`; el resumen solo muestra el
+desglose por línea que devuelve.
+
 ## Tests
 
 ```powershell
@@ -154,6 +164,8 @@ Todas las rutas cuelgan de `/api/`. Salvo `login`, requieren
 | `GET`/`PATCH` | `/api/core/config/store/` | Configuración (recargo, venta con stock 0) |
 | `GET/POST` | `/api/products/` | Catálogo |
 | `POST` | `/api/products/barcode_lookup/?code=` | Buscar por código de barra |
+| `GET/POST` | `/api/categories/` | Categorías y su recargo compartido |
+| `GET` | `/api/categories/surcharge-presets/` | Atajos de recargo sugeridos |
 | `GET/POST` | `/api/product-images/` | Imágenes (multipart) |
 | `POST` | `/api/product-images/{id}/set_primary/` | Marcar imagen principal |
 | `GET` | `/api/rates/` | Historial de tasas |
@@ -178,6 +190,12 @@ Todas las rutas cuelgan de `/api/`. Salvo `login`, requieren
 ## Reglas del dominio
 
 - **Dinero:** todo importe es `Decimal`. Está prohibido `float`/`double`.
+- **Recargo por línea:** el porcentaje se resuelve en este orden:
+  `artículo > categoría > tienda`. En el carrito, el cajero puede ajustarlo por
+  línea. Solo se envía al servidor cuando se elige un valor **distinto** al que ya
+  resolvió el catálogo, así que confirmar el valor heredado nunca fija un
+  artículo. Al crear la venta, un valor distinto sí queda como nuevo recargo
+  propio del artículo. `quote` no escribe nada.
 - **Stock:** cada cambio pasa por `inventory.services.record_movement`, que
   bloquea la fila del producto y corre dentro de una transacción.
 - **Historial:** los movimientos no se borran. Las correcciones son movimientos
@@ -194,7 +212,7 @@ Todas las rutas cuelgan de `/api/`. Salvo `login`, requieren
 backend/
   config/      settings, urls, wsgi
   core/        auth, roles, permisos, configuración, dinero, búsqueda
-  catalog/     productos e imágenes
+  catalog/     categorías, productos e imágenes
   rates/       historial BCV y tasa manual
   inventory/   movimientos, entradas, notas de salida
   customers/   clientes

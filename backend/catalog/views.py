@@ -1,28 +1,67 @@
 import logging
 
-from django.db.models import F
+from django.db.models import Count, F, Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
-from catalog.models import Product, ProductImage
+from catalog.models import Category, Product, ProductImage
 from catalog.serializers import (
     UNIT_CHOICES,
+    CategorySerializer,
     ProductImageSerializer,
     ProductSerializer,
     ProductWriteSerializer,
 )
+from catalog.surcharge import SURCHARGE_PRESET_VALUES
 from core.permissions import CanAccessResource
 
 logger = logging.getLogger(__name__)
 
 
+class CategoryViewSet(viewsets.ModelViewSet):
+    """Categories with their shared surcharge.
+
+    A category is referenced by products through a PROTECT foreign key, so
+    deleting one that still has articles is refused by the database rather than
+    silently orphaning them.
+    """
+
+    permission_model = Category
+    permission_classes = [CanAccessResource]
+    serializer_class = CategorySerializer
+    filterset_fields = ['is_active']
+    search_fields = ['name', 'code']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+
+    def get_queryset(self):
+        queryset = Category.objects.annotate(
+            product_count=Count('products', filter=Q(products__is_active=True))
+        )
+        if self.request.query_params.get('include_inactive') != 'true':
+            queryset = queryset.filter(is_active=True)
+        return queryset
+
+    @action(detail=False, methods=['get'], url_path='surcharge-presets')
+    def surcharge_presets(self, request):
+        """Quick-pick percentages offered by the till."""
+        return Response({'values': SURCHARGE_PRESET_VALUES})
+
+    def perform_destroy(self, instance):
+        if instance.products.exists():
+            raise ValidationError(
+                {'detail': 'La categoría tiene artículos asignados. Quítaselos antes de eliminarla.'}
+            )
+        instance.delete()
+
+
 class ProductViewSet(viewsets.ModelViewSet):
     permission_model = Product
     permission_classes = [CanAccessResource]
-    filterset_fields = ['is_active', 'unit_of_measure', 'brand']
+    filterset_fields = ['is_active', 'unit_of_measure', 'brand', 'category']
     search_fields = ['name', 'brand', 'code', 'barcode']
     ordering_fields = ['name', 'code', 'price_usd', 'cost_usd', 'stock', 'created_at']
     ordering = ['name']
@@ -48,7 +87,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return Response(ProductSerializer(product, context=self.get_serializer_context()).data)
 
     def get_queryset(self):
-        queryset = Product.objects.all()
+        queryset = Product.objects.select_related('category')
         if self.request.query_params.get('include_inactive') != 'true':
             queryset = queryset.filter(is_active=True)
         if self.request.query_params.get('low_stock') == 'true':

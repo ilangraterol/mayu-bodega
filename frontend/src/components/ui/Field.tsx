@@ -10,6 +10,9 @@ const FIELD_BASE =
 
 interface FieldProps {
   label: string
+  /** Rendered in the label slot instead of the text, e.g. the animated
+      search icon on the point of sale. */
+  icon?: ReactNode
   hint?: string
   error?: string
   required?: boolean
@@ -17,14 +20,21 @@ interface FieldProps {
 }
 
 /** Wraps a control with its label, hint and error message. */
-export function Field({ label, hint, error, required, children }: FieldProps) {
+export function Field({ label, icon, hint, error, required, children }: FieldProps) {
   const id = useId()
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
-        {label}
-        {required ? <span className="ml-0.5 text-red-600">*</span> : null}
-      </label>
+      {label || icon ? (
+        <label
+          htmlFor={id}
+          className={`block text-sm font-medium text-slate-700 ${
+            icon && !label ? 'flex justify-center' : ''
+          }`}
+        >
+          {icon ?? label}
+          {required ? <span className="ml-0.5 text-red-600">*</span> : null}
+        </label>
+      ) : null}
       {children(id)}
       {error ? (
         <p className="text-xs text-red-600" role="alert">
@@ -39,13 +49,22 @@ export function Field({ label, hint, error, required, children }: FieldProps) {
 
 interface TextInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'id'> {
   label: string
+  icon?: ReactNode
   hint?: string
   error?: string
 }
 
-export function TextInput({ label, hint, error, required, className = '', ...rest }: TextInputProps) {
+export function TextInput({
+  label,
+  icon,
+  hint,
+  error,
+  required,
+  className = '',
+  ...rest
+}: TextInputProps) {
   return (
-    <Field label={label} hint={hint} error={error} required={required}>
+    <Field label={label} icon={icon} hint={hint} error={error} required={required}>
       {(id) => (
         <input
           {...rest}

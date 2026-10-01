@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from catalog.surcharge import SURCHARGE_MAX_PERCENT
 from core.enums import CURRENCY_CHOICES, CURRENCY_USD
 from core.money import MONEY_PLACES, QUANTITY_PLACES
 from customers.models import Customer
@@ -19,6 +20,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(source='product.code', read_only=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
     primary_image_url = serializers.SerializerMethodField()
+    surcharge_source_display = serializers.CharField(source='get_surcharge_source_display', read_only=True)
 
     class Meta:
         model = SaleItem
@@ -31,6 +33,10 @@ class SaleItemSerializer(serializers.ModelSerializer):
             'quantity',
             'unit_price_usd',
             'line_total_usd',
+            'surcharge_percentage',
+            'surcharge_usd',
+            'surcharge_source',
+            'surcharge_source_display',
         ]
         read_only_fields = ['line_total_usd']
 
@@ -152,6 +158,16 @@ class SaleItemInputSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(max_digits=12, decimal_places=QUANTITY_PLACES, min_value=Decimal('0.001'))
     unit_price_usd = serializers.DecimalField(
         max_digits=12, decimal_places=MONEY_PLACES, required=False, min_value=Decimal('0.00')
+    )
+    # The percentage the cashier chose for this line. Omitted means "use the
+    # catalogue", which is what an untouched cart sends.
+    surcharge_percentage = serializers.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+        min_value=Decimal('0.00'),
+        max_value=SURCHARGE_MAX_PERCENT,
     )
 
 

@@ -57,6 +57,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Serves the built SPA assets and product photos in production, where
+    # `static()` is inactive because DEBUG is False.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -128,7 +131,10 @@ STORAGES = {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
     },
     'staticfiles': {
-        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        # WhiteNoise serves `STATIC_ROOT` itself. Without it Django only serves
+        # static files while DEBUG is True, which would break the built app in
+        # production. Hashing gives long-lived cache headers.
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
     },
 }
 

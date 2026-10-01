@@ -11,6 +11,8 @@
 
 import { useState } from 'react'
 
+import { toSameOrigin } from '../../lib/mediaUrl'
+
 function initials(name: string): string {
   return name
     .split(' ')
@@ -32,6 +34,7 @@ interface ProductImageProps {
  */
 export function ProductImage({ src, alt, className = '' }: ProductImageProps) {
   const [failed, setFailed] = useState(false)
+  const resolved = toSameOrigin(src)
 
   if (!src || failed) {
     return (
@@ -47,7 +50,7 @@ export function ProductImage({ src, alt, className = '' }: ProductImageProps) {
 
   return (
     <img
-      src={src}
+      src={resolved}
       alt={alt}
       loading="lazy"
       decoding="async"

@@ -4,12 +4,17 @@ One ``Product`` row per commercial article. Presentation changes (a pack, a
 bulto) do not create a new product: they are expressed through
 ``units_per_package``, the number of internal units contained in a pack/bulto
 used when receiving merchandise in bulk.
+
+``Category`` groups articles and carries a shared surcharge. Both the category
+and the article expose a nullable ``surcharge_percentage``: ``None`` means
+"inherit the level above", which is what makes the article > category > store
+resolution in :mod:`catalog.surcharge` work.
 """
 
 from decimal import Decimal
 from pathlib import Path
 
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 
 from catalog.image_processing import (
@@ -19,6 +24,7 @@ from catalog.image_processing import (
     process_product_image,
     process_product_thumbnail,
 )
+from catalog.surcharge import SURCHARGE_MAX_PERCENT, SURCHARGE_MIN_PERCENT
 from core.money import MONEY_PLACES, QUANTITY_PLACES, RATE_PLACES, quantize_quantity
 
 UNIT_UNIDAD = 'UNIDAD'
@@ -44,6 +50,78 @@ UNIT_OF_MEASURE_CHOICES = [
 # Units that express a bulk container holding `units_per_package` internal units.
 BULK_UNITS = {UNIT_PAQUETE, UNIT_BULTO, UNIT_CAJA}
 
+# Shared validators for every level that can carry a surcharge. A nullable
+# percentage means "inherit", so the minimum/maximum only apply when it is set.
+SURCHARGE_VALIDATORS = [
+    MinValueValidator(SURCHARGE_MIN_PERCENT),
+    MaxValueValidator(SURCHARGE_MAX_PERCENT),
+]
+
+
+class Category(models.Model):
+    """A family of articles that shares a name and, optionally, a surcharge."""
+
+    code = models.CharField(max_length=16, unique=True, editable=False)
+    name = models.CharField(
+        max_length=120,
+        unique=True,
+        help_text='Nombre de la categoría, por ejemplo "Abarrotes" o "Lácteos".',
+    )
+    surcharge_percentage = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        validators=SURCHARGE_VALIDATORS,
+        verbose_name='Recargo de la categoría (%)',
+        help_text='Se aplica a los artículos de la categoría que no tengan recargo propio. Vacío = hereda el recargo de la tienda.',
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Categoría'
+        verbose_name_plural = 'Categorías'
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(surcharge_percentage__isnull=True)
+                    | (
+                        models.Q(surcharge_percentage__gte=SURCHARGE_MIN_PERCENT)
+                        & models.Q(surcharge_percentage__lte=SURCHARGE_MAX_PERCENT)
+                    )
+                ),
+                name='category_surcharge_between_0_and_100',
+            ),
+        ]
+        indexes = [models.Index(fields=['name']), models.Index(fields=['is_active'])]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = self._generate_code()
+        return super().save(*args, **kwargs)
+
+    @classmethod
+    def _generate_code(cls) -> str:
+        last = cls.objects.order_by('-id').values_list('code', flat=True).first()
+        sequence = 0
+        if last and last.startswith('C'):
+            try:
+                sequence = int(last[1:])
+            except ValueError:
+                sequence = 0
+        candidate = f'C{sequence + 1:04d}'
+        while cls.objects.filter(code=candidate).exists():
+            sequence += 1
+            candidate = f'C{sequence + 1:04d}'
+        return candidate
+
 
 class ProductQuerySet(models.QuerySet):
     def active(self):
@@ -61,6 +139,24 @@ class Product(models.Model):
     barcode = models.CharField(max_length=64, unique=True, null=True, blank=True)
     name = models.CharField(max_length=255)
     brand = models.CharField(max_length=120, blank=True, default='')
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='products',
+        verbose_name='Categoría',
+    )
+    surcharge_percentage = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        validators=SURCHARGE_VALIDATORS,
+        verbose_name='Recargo del artículo (%)',
+        help_text='Recargo propio del artículo. Vacío = hereda el de su categoría, o el de la tienda si tampoco tiene categoría.',
+    )
     unit_of_measure = models.CharField(
         max_length=20,
         choices=UNIT_OF_MEASURE_CHOICES,
@@ -141,6 +237,16 @@ class Product(models.Model):
             models.CheckConstraint(
                 condition=models.Q(cost_usd__gte=0) & models.Q(price_usd__gte=0),
                 name='product_amounts_gte_0',
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(surcharge_percentage__isnull=True)
+                    | (
+                        models.Q(surcharge_percentage__gte=SURCHARGE_MIN_PERCENT)
+                        & models.Q(surcharge_percentage__lte=SURCHARGE_MAX_PERCENT)
+                    )
+                ),
+                name='product_surcharge_between_0_and_100',
             ),
             # One product per external reference, so a re-run of an import
             # updates the existing row instead of duplicating the catalogue.

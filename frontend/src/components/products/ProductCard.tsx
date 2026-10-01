@@ -1,6 +1,6 @@
 /** Product card for the point-of-sale grid. */
 
-import { formatUsd } from '../../lib/money'
+import { formatUsdCompact } from '../../lib/money'
 import type { Product } from '../../types/api'
 import { Badge, StockBadge } from '../ui/Primitives'
 import { ProductImage } from './ProductImage'
@@ -38,18 +38,29 @@ export function ProductCard({ product, inCart, onSelect, disabled }: ProductCard
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col gap-1 p-2">
-        <span className="line-clamp-2 text-xs leading-tight font-medium text-slate-800">
+      <div className="flex flex-1 flex-col gap-0.5 p-1.5">
+        {/* The brand is skipped: it already reads as part of the name, and on a
+            mobile grid every line is space that could show another product.
+            The name is not clamped, because a truncated product name is worse
+            than a card that is slightly taller: the cashier cannot tell two
+            similar products apart. */}
+        <span className="text-[11px] leading-tight font-medium break-words text-slate-800">
           {product.name}
         </span>
-        {product.brand ? (
-          <span className="truncate text-[11px] text-slate-400">{product.brand}</span>
-        ) : null}
-        <div className="mt-auto flex items-center justify-between gap-1 pt-1">
-          <span className="tabular text-sm font-semibold text-slate-900">
-            {formatUsd(product.price_usd)}
+        <div className="mt-auto flex items-center justify-between gap-0.5 pt-0.5">
+          <span className="tabular text-xs font-semibold text-slate-900">
+            {formatUsdCompact(product.price_usd)}
           </span>
-          <StockBadge stock={product.stock} pending={product.pending_units} />
+          {/* The badge is shared with wider layouts, so the tighter padding is
+              applied here: inside a four-column phone grid every pixel of the
+              price row is contested. */}
+          <span className="[&>span]:px-1.5 [&>span]:text-[11px]">
+            <StockBadge
+              stock={product.stock}
+              pending={product.pending_units}
+              compact
+            />
+          </span>
         </div>
       </div>
     </button>

@@ -14,6 +14,7 @@ import { useRef, useState } from 'react'
 
 import { Button } from '../ui/Button'
 import { ErrorBanner } from '../ui/Feedback'
+import { toSameOrigin } from '../../lib/mediaUrl'
 import { useDeleteProductImage, useSetPrimaryImage, useUploadProductImage } from '../../hooks/useProducts'
 import type { Product } from '../../types/api'
 
@@ -76,7 +77,7 @@ export function ProductImages({ product }: { product: Product }) {
           {images.map((image) => (
             <li key={image.id} className="relative">
               <img
-                src={image.thumbnail_url}
+                src={toSameOrigin(image.thumbnail_url)}
                 alt={product.name}
                 loading="lazy"
                 decoding="async"

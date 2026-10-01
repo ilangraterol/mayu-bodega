@@ -20,6 +20,7 @@ from catalog.models import (
     UNIT_KILO,
     UNIT_LIBRA,
     UNIT_UNIDAD,
+    Category,
     Product,
 )
 from core.enums import CURRENCY_USD
@@ -127,6 +128,35 @@ PRODUCTS = [
     },
 ]
 
+# A null surcharge means "inherit from the store", so groceries can follow the
+# global default while a riskier family carries its own markup.
+CATEGORIES = [
+    {'name': 'Abarrotes', 'surcharge_percentage': None},
+    {'name': 'Bebidas', 'surcharge_percentage': Decimal('5.00')},
+    {'name': 'Limpieza del hogar', 'surcharge_percentage': Decimal('10.00')},
+    {'name': 'Café y gallerías', 'surcharge_percentage': Decimal('3.00')},
+]
+
+# Article name -> category name. Products not listed stay uncategorised, which
+# is exactly how the pre-existing catalogue behaves.
+PRODUCT_CATEGORIES = {
+    'Tostones picantes con limón TOM 270G': 'Abarrotes',
+    'Arroz blanco 5kg': 'Abarrotes',
+    'Aceite vegetal 1L': 'Abarrotes',
+    'Azúcar 1kg': 'Abarrotes',
+    'Detergente en polvo 5kg': 'Limpieza del hogar',
+    'Pasta corta 500g': 'Abarrotes',
+    'Café molido 500g': 'Café y gallerías',
+    'Agua mineral PET 1.5L': 'Bebidas',
+    'Harina de trigo 1kg': 'Abarrotes',
+    'Atún en lata 170g': 'Abarrotes',
+}
+
+# A product with its own percentage beats the percentage of its category.
+PRODUCT_SURCHARGES = {
+    'Café molido 500g': Decimal('7.50'),
+}
+
 CUSTOMERS = [
     {'document_id': 'V-12345678', 'name': 'María González', 'phone': '0412-1234567', 'address': 'Av. Bolívar, Catia'},
     {'document_id': 'V-23456789', 'name': 'José Ramírez', 'phone': '0414-2345678', 'address': 'Urb. Los Pinos, casa 12'},
@@ -159,7 +189,8 @@ class Command(BaseCommand):
         sync_role_groups()
         admin = self._create_users()
         self._create_rates(admin)
-        products = self._create_products()
+        categories = self._create_categories()
+        products = self._create_products(categories)
         customers = self._create_customers()
         self._create_stock(products, admin)
         self._create_sales(products, customers, admin, options['flush_sales'])
@@ -168,6 +199,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Datos de demostración cargados.'))
         self.stdout.write(f'Usuarios: {[u[0] for u in USERS]} · contraseña: {DEMO_PASSWORD}')
         self.stdout.write(f'Productos: {len(products)} · Clientes: {len(customers)}')
+        self.stdout.write(
+            'Categorías: '
+            + ', '.join(f'{category.name} ({category.surcharge_percentage or "hereda"})' for category in categories)
+        )
 
     def _create_users(self) -> User:
         admin = None
@@ -207,15 +242,55 @@ class Command(BaseCommand):
                 notes='Tasa manual de respaldo cargada por el comando de demostración.',
             )
 
-    def _create_products(self) -> list[Product]:
+    def _create_categories(self) -> list[Category]:
+        categories = []
+        for payload in CATEGORIES:
+            category, _ = Category.objects.update_or_create(
+                name=payload['name'],
+                defaults={'surcharge_percentage': payload['surcharge_percentage'], 'is_active': True},
+            )
+            categories.append(category)
+        return categories
+
+    def _create_products(self, categories: list[Category]) -> list[Product]:
+        by_name = {category.name: category for category in categories}
         products = []
         for payload in PRODUCTS:
             data = dict(payload)
             data['cost_usd'] = Decimal(data['cost_usd'])
             data['price_usd'] = Decimal(data['price_usd'])
-            product, _ = Product.objects.update_or_create(name=data.pop('name'), defaults=data)
+            name = data.pop('name')
+            category_name = PRODUCT_CATEGORIES.get(name)
+            if category_name:
+                data['category'] = by_name[category_name]
+            data['surcharge_percentage'] = PRODUCT_SURCHARGES.get(name)
+            product = self._upsert_product(name, data)
             products.append(product)
         return products
+
+    def _upsert_product(self, name: str, data: dict) -> Product:
+        """Create or refresh a demo article without tripping the barcode unique.
+
+        The barcode is unique in the database, so matching by name alone is not
+        enough: the real catalogue may already hold "Azucar Bugalu 1kg" with the
+        barcode the demo calls "Azucar 1kg". Reusing that row keeps the seed
+        idempotent instead of aborting the whole load on a collision.
+        """
+        existing = Product.objects.filter(name=name).first()
+        if existing is None and data.get('barcode'):
+            existing = Product.objects.filter(barcode=data['barcode']).first()
+
+        if existing is None:
+            return Product.objects.create(name=name, **data)
+
+        # A barcode shared with another row cannot be claimed twice, and the
+        # existing descriptive name is kept: the real catalogue may hold a
+        # better name than the demo one, and the seed must not erase it.
+        data.pop('barcode', None)
+        for field, value in data.items():
+            setattr(existing, field, value)
+        existing.save()
+        return existing
 
     def _create_customers(self) -> list[Customer]:
         customers = []

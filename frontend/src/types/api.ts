@@ -61,12 +61,55 @@ export interface ProductImage {
   created_at: string
 }
 
+/**
+ * Where a line's surcharge came from, in precedence order:
+ * `PRODUCT` (the article's own value) > `CATEGORY` > `STORE` (global default).
+ * `MANUAL` means the cashier changed it for this line at the till.
+ */
+export const SURCHARGE_SOURCE = {
+  MANUAL: 'MANUAL',
+  PRODUCT: 'PRODUCT',
+  CATEGORY: 'CATEGORY',
+  STORE: 'STORE',
+} as const
+export type SurchargeSource = (typeof SURCHARGE_SOURCE)[keyof typeof SURCHARGE_SOURCE]
+
+export interface Category {
+  id: number
+  code: string
+  name: string
+  /** `null` means "inherit", so the store default still applies. */
+  surcharge_percentage: string | null
+  /** Pre-formatted for the UI; `"Heredado"` when the category defines none. */
+  surcharge_percentage_display: string
+  is_active: boolean
+  product_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CategoryPayload {
+  name: string
+  /** An empty string is sent as `null`, which means "inherit". */
+  surcharge_percentage?: string | null
+  is_active?: boolean
+}
+
 export interface Product {
   id: number
   code: string
   barcode: string | null
   name: string
   brand: string
+  category: number | null
+  category_name: string | null
+  /** The article's own surcharge, or `null` when it inherits. */
+  surcharge_percentage: string | null
+  /** Resolved article > category > store. Pre-fills the cart line. */
+  effective_surcharge_percentage: string
+  surcharge_source: SurchargeSource
+  surcharge_source_display: string
+  surcharge_presets: string[]
   unit_of_measure: UnitOfMeasure
   unit_of_measure_display: string
   units_per_package: number
@@ -92,6 +135,9 @@ export interface ProductPayload {
   barcode?: string | null
   name: string
   brand?: string
+  category?: number | null
+  /** An empty string is sent as `null`, which means "inherit". */
+  surcharge_percentage?: string | null
   unit_of_measure: UnitOfMeasure
   units_per_package?: number | null
   cost_usd: string
@@ -203,6 +249,11 @@ export interface SaleItem {
   quantity: string
   unit_price_usd: string
   line_total_usd: string
+  /** The percentage frozen into this line at the moment of the sale. */
+  surcharge_percentage: string
+  surcharge_usd: string
+  surcharge_source: SurchargeSource
+  surcharge_source_display: string
 }
 
 export interface Sale {
@@ -237,6 +288,11 @@ export interface SaleItemInput {
   product_id: number
   quantity: string
   unit_price_usd?: string
+  /**
+   * The percentage the cashier chose for this line. Omitted means "use the
+   * catalogue", which is what an untouched cart sends.
+   */
+  surcharge_percentage?: string
 }
 
 export interface SalePayload {
@@ -258,6 +314,13 @@ export interface QuoteLine {
   unit_price_usd: string
   stock: string
   line_total_usd: string
+  /** The percentage this line would pay: the chosen one, or the inherited one. */
+  surcharge_percentage: string
+  surcharge_usd: string
+  surcharge_source: SurchargeSource
+  surcharge_source_display: string
+  /** The line subtotal plus its own surcharge. */
+  total_with_surcharge_usd: string
 }
 
 export interface Quote {
@@ -267,8 +330,11 @@ export interface Quote {
   total_ves: string
   exchange_rate_applied: string
   rate_effective_date: string
+  /** Subtotal-weighted average of the per-line percentages. */
   surcharge_percentage: string
   allow_zero_stock_sale: boolean
+  /** Quick-pick percentages offered by the till. */
+  surcharge_presets: string[]
   lines: QuoteLine[]
 }
 

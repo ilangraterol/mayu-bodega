@@ -1,10 +1,64 @@
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from catalog.image_processing import validate_upload
-from catalog.models import UNIT_OF_MEASURE_CHOICES, Product, ProductImage
+from catalog.models import UNIT_OF_MEASURE_CHOICES, Category, Product, ProductImage
+from catalog.surcharge import (
+    SURCHARGE_PRESET_VALUES,
+    coerce_surcharge,
+    resolve_surcharge,
+    surcharge_label,
+)
 from core.models import StoreConfig
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    product_count = serializers.IntegerField(read_only=True, default=0)
+    surcharge_percentage_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = [
+            'id',
+            'code',
+            'name',
+            'surcharge_percentage',
+            'surcharge_percentage_display',
+            'is_active',
+            'product_count',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['code', 'created_at', 'updated_at']
+
+    def get_surcharge_percentage_display(self, obj) -> str:
+        if obj.surcharge_percentage is None:
+            return 'Heredado'
+        return f'{obj.surcharge_percentage}%'
+
+    def validate_name(self, value):
+        value = (value or '').strip()
+        if not value:
+            raise serializers.ValidationError('El nombre de la categoría es obligatorio.')
+        return value
+
+    def validate_surcharge_percentage(self, value):
+        # An empty field means "inherit", not "zero": the till falls through to
+        # the store default in that case.
+        try:
+            return coerce_surcharge(value, allow_none=True)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError(_first_message(error)) from error
+
+
+def _first_message(error: DjangoValidationError) -> str:
+    """DRF wants a string or a list of strings, not Django's dict payload."""
+    if hasattr(error, 'message_dict'):
+        for messages in error.message_dict.values():
+            return messages[0]
+    return error.messages[0] if error.messages else 'Valor inválido.'
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
@@ -64,6 +118,13 @@ class ProductSerializer(serializers.ModelSerializer):
     primary_image_url = serializers.SerializerMethodField()
     can_sell_with_zero_stock = serializers.SerializerMethodField()
     net_units = serializers.DecimalField(source='net_position', max_digits=12, decimal_places=3, read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True, default=None)
+    # The resolved percentage is what the till pre-fills per line, so the client
+    # never has to re-implement article > category > store.
+    effective_surcharge_percentage = serializers.SerializerMethodField()
+    surcharge_source = serializers.SerializerMethodField()
+    surcharge_source_display = serializers.SerializerMethodField()
+    surcharge_presets = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -73,6 +134,13 @@ class ProductSerializer(serializers.ModelSerializer):
             'barcode',
             'name',
             'brand',
+            'category',
+            'category_name',
+            'surcharge_percentage',
+            'effective_surcharge_percentage',
+            'surcharge_source',
+            'surcharge_source_display',
+            'surcharge_presets',
             'unit_of_measure',
             'unit_of_measure_display',
             'units_per_package',
@@ -90,6 +158,23 @@ class ProductSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['code', 'stock', 'pending_units', 'created_at', 'updated_at']
+
+    def _store_default(self):
+        return StoreConfig.load().default_surcharge_percentage
+
+    def get_effective_surcharge_percentage(self, obj) -> str:
+        percentage, _source = resolve_surcharge(obj, self._store_default())
+        return str(percentage)
+
+    def get_surcharge_source(self, obj) -> str:
+        _percentage, source = resolve_surcharge(obj, self._store_default())
+        return source
+
+    def get_surcharge_source_display(self, obj) -> str:
+        return surcharge_label(self.get_surcharge_source(obj))
+
+    def get_surcharge_presets(self, obj) -> list[str]:
+        return SURCHARGE_PRESET_VALUES
 
     def get_primary_image_url(self, obj) -> str:
         image = obj.primary_image
@@ -119,6 +204,12 @@ class ProductSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Debe ser al menos 1 unidad por empaque.')
         return value
 
+    def validate_surcharge_percentage(self, value):
+        try:
+            return coerce_surcharge(value, allow_none=True)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError(_first_message(error)) from error
+
     def validate(self, attrs):
         for field in ('cost_usd', 'price_usd'):
             if field in attrs and attrs[field] is None:
@@ -143,6 +234,8 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             'barcode',
             'name',
             'brand',
+            'category',
+            'surcharge_percentage',
             'unit_of_measure',
             'unit_of_measure_display',
             'units_per_package',
@@ -165,6 +258,19 @@ class ProductWriteSerializer(serializers.ModelSerializer):
     def validate_units_per_package(self, value):
         if value is not None and value < 1:
             raise serializers.ValidationError('Debe ser al menos 1 unidad por empaque.')
+        return value
+
+    def validate_surcharge_percentage(self, value):
+        try:
+            return coerce_surcharge(value, allow_none=True)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError(_first_message(error)) from error
+
+    def validate_category(self, value):
+        if value is None:
+            return None
+        if not Category.objects.filter(pk=value.pk).exists():
+            raise serializers.ValidationError('Categoría no encontrada.')
         return value
 
     def validate(self, attrs):
