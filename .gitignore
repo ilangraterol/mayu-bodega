@@ -20,6 +20,9 @@ backend/staticfiles/
 local_settings.py
 backend/rates/certs/.cache/
 
+# Respaldos locales de la base. Son copias de datos del negocio: nunca al repo.
+backend/backups/
+
 # Material local de trabajo: fotos de producto sin procesar, exportaciones y
 # borradores. Son datos del negocio, no código.
 Productos/

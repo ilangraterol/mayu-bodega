@@ -39,6 +39,8 @@ Variables opcionales:
 | `check_images.py`            | Auditoría del catálogo: quién tiene foto, filas rotas, principales | no      |
 | `check_urls.py`              | Comprueba que cada foto referenciada responde HTTP 200           | no      |
 | `check_seed_conflicts.py`    | Conflictos que harían fallar `manage.py seed_demo` (códigos de barra, categorías) | no |
+| `audit_seed_contamination.py` | Muestra qué dejó el seed: categorías y artículos propios, artículos reales absorbidos por código de barra, y los precios pisados | no |
+| `purge_seed_catalog.py`      | Quita las categorías del seed y **desactiva** sus artículos. El baseline se calcula solo, así una categoría previa (p. ej. "Bebidas") nunca se toca | con `--apply` |
 | `restore_seed_names.py`      | Devuelve a los artículos el nombre descriptivo que `seed_demo` acortó | con `--apply` |
 | `inspect_image.py`           | Formato, tamaño, dimensiones y prueba de bloqueo de un archivo   | no      |
 | `test_image_api.py`          | Humo del ciclo completo por HTTP (listar, con `--apply`, crear/borrar) | con `--apply` |
@@ -68,7 +70,33 @@ los ayudantes de salida que comparten todos los demás.
 
 # Antes de commitear db.sqlite3, deja la base sin tokens de API válidos
 ..\.venv\Scripts\python.exe tools\purge_api_tokens.py --apply
+
+# Ver qué le hizo seed_demo a un catálogo real (solo informe)
+..\.venv\Scripts\python.exe tools\audit_seed_contamination.py
+
+# Sacar del catálogo las categorías y artículos del seed
+..\.venv\Scripts\python.exe tools\purge_seed_catalog.py
+..\.venv\Scripts\python.exe tools\purge_seed_catalog.py --apply
 ```
+
+## Sobre `seed_demo` y un catálogo real
+
+`seed_demo` **pisa artículos reales**. `_upsert_product` busca por nombre y luego
+por código de barras, así que si tu artículo ya ocupa el código que el seed
+quiere usar, lo reutiliza y le sobrescribe precio, costo, marca, unidad y
+categoría. Después no hay forma de recuperar los valores anteriores: no quedan en
+el historial y no hay respaldo.
+
+Por eso, con un catálogo cargado:
+
+1. No corras `manage.py seed_demo`.
+2. Antes de cualquier commit de `db.sqlite3`, revisa y limpia:
+   `audit_seed_contamination.py` para ver el alcance y `purge_seed_catalog.py`
+   para quitar categorías y desactivar artículos del seed.
+
+Los artículos del seed se **desactivan, no se borran**: todos tienen movimientos
+de inventario y `StockMovement.product` es `PROTECT`, porque el historial de
+movimientos es inmutable.
 
 ## Añadir una herramienta nueva
 
