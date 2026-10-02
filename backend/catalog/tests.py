@@ -199,6 +199,67 @@ class ProductImageApiTestCase(TestCase):
         self.assertEqual(body['images'], [])
 
 
+class BarcodeLookupTestCase(TestCase):
+    """The exact-hit lookup the till and the catalogue both depend on.
+
+    ``useExactBarcodeOpen`` opens the article as soon as this returns 200, so the
+    difference between an exact match and a miss is what decides whether the
+    cashier gets a modal or just a filtered list. A partial code must never match:
+    that is what used to report "not found" while the grid was full of hits.
+    """
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_superuser(
+            username='admin', email='admin@mayu.test', password='x'
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.product = Product.objects.create(
+            name='Lapiz Mongol 2B',
+            barcode='7591001000054',
+            cost_usd=Decimal('0.25'),
+            price_usd=Decimal('0.50'),
+        )
+
+    def lookup(self, code):
+        return self.client.get('/api/products/barcode_lookup/', {'code': code})
+
+    def test_exact_barcode_returns_the_product(self):
+        response = self.lookup('7591001000054')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['id'], self.product.pk)
+        self.assertEqual(response.json()['barcode'], '7591001000054')
+
+    def test_partial_barcode_does_not_match(self):
+        """A scan still in progress must stay silent, not open the wrong article."""
+        for partial in ('7', '7591', '759100100005', '7591001000055'):
+            self.assertEqual(self.lookup(partial).status_code, 404, partial)
+
+    def test_unknown_and_empty_code_are_reported_as_not_found(self):
+        self.assertEqual(self.lookup('0000000000000').status_code, 404)
+        self.assertEqual(self.lookup('').status_code, 400)
+
+    def test_numeric_internal_code_is_accepted_as_a_fallback(self):
+        self.product.code = '4242'
+        self.product.save(update_fields=['code'])
+        response = self.lookup('4242')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['id'], self.product.pk)
+
+    def test_lookup_ignores_surrounding_whitespace(self):
+        response = self.lookup('  7591001000054  ')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['id'], self.product.pk)
+
+    def test_inactive_article_is_still_reachable(self):
+        """The catalogue sheet has to be able to reopen and reactivate it."""
+        self.product.is_active = False
+        self.product.save(update_fields=['is_active'])
+        response = self.lookup('7591001000054')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()['is_active'])
+
+
 class ImageProcessingTestCase(TestCase):
     def test_processing_releases_the_file_handle(self):
         """Windows refuses ``os.remove`` while a PIL image still holds the file.

@@ -58,15 +58,7 @@ export function ProductImages({ product }: { product: Product }) {
   }
 
   return (
-    <section aria-labelledby="images-heading" className="space-y-2">
-      <div className="flex items-baseline justify-between">
-        <h3 id="images-heading" className="text-sm font-semibold text-slate-800">
-          Fotos
-        </h3>
-        <span className="text-xs text-slate-500">
-          {images.length === 0 ? 'Sin fotos' : `${images.length} foto${images.length === 1 ? '' : 's'}`}
-        </span>
-      </div>
+    <section aria-label="Fotos" className="space-y-2">
 
       {images.length === 0 ? (
         <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">

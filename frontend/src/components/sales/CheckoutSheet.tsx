@@ -14,7 +14,16 @@ import { useMemo, useState } from 'react'
 
 import { useCustomers } from '../../hooks/useCustomers'
 import { useCreateSale } from '../../hooks/useSales'
-import { formatRate, formatUsd, formatVes, parseMoney, roundMoney, toMoneyString } from '../../lib/money'
+import {
+  digitsToAmount,
+  formatRate,
+  formatUsd,
+  formatVes,
+  nextAmountDigits,
+  parseMoney,
+  roundMoney,
+  toMoneyString,
+} from '../../lib/money'
 import { PAYMENT_METHOD_LABELS, USD_METHODS, VES_METHODS } from '../../lib/labels'
 import { CURRENCY_USD, CURRENCY_VES, SALE_TYPE } from '../../types/api'
 import type { Currency, PaymentMethod, Quote, SaleItemInput, SaleType } from '../../types/api'
@@ -106,6 +115,20 @@ function CheckoutForm({ quote, items, onClose, onDone }: CheckoutFormProps) {
   function onCurrencyChange(next: Currency) {
     setCurrency(next)
     setMethod((current) => methodForCurrency(next, current))
+    // The amount received starts at the total in the chosen currency, so the
+    // cashier does not have to type it. Both figures come from the server quote:
+    // the client never decides what the customer owes in VES.
+    setPaidAmount(toMoneyString(next === CURRENCY_VES ? quote.total_ves : quote.total_usd))
+  }
+
+  /**
+   * In VES the field is filled by digits, so the cashier types "45784" and sees
+   * "457.84" grow as they type. `paidAmount` is always the formatted amount, and
+   * its digits are the input, which keeps one source of truth for the value the
+   * API receives.
+   */
+  function onVesAmountChange(rawValue: string) {
+    setPaidAmount(digitsToAmount(nextAmountDigits(paidAmount, rawValue)))
   }
 
   const canSubmit = useMemo(() => {
@@ -228,7 +251,7 @@ function CheckoutForm({ quote, items, onClose, onDone }: CheckoutFormProps) {
                       : 'border-slate-300 bg-white text-slate-700'
                   }`}
                 >
-                  Dollars
+                  Dólares
                 </button>
                 <button
                   type="button"
@@ -250,13 +273,26 @@ function CheckoutForm({ quote, items, onClose, onDone }: CheckoutFormProps) {
                 options={currency === CURRENCY_VES ? VES_METHOD_OPTIONS : USD_METHOD_OPTIONS}
               />
 
-              <NumberInput
-                label={`Monto recibido (${currency})`}
-                required
-                value={paidAmount}
-                onChange={(event) => setPaidAmount(event.target.value)}
-                step="0.01"
-              />
+              {currency === CURRENCY_VES ? (
+                <TextInput
+                  label="Monto recibido (VES)"
+                  required
+                  value={paidAmount}
+                  onChange={(event) => onVesAmountChange(event.target.value)}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="0.00"
+                  hint="Solo dígitos: 104 se vuelve 1.04 y 45784 se vuelve 457.84."
+                />
+              ) : (
+                <NumberInput
+                  label="Monto recibido (USD)"
+                  required
+                  value={paidAmount}
+                  onChange={(event) => setPaidAmount(event.target.value)}
+                  step="0.01"
+                />
+              )}
 
               <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
                 <span className="text-slate-500">Total a cobrar</span>

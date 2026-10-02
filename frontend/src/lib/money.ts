@@ -41,16 +41,39 @@ export function toQuantityString(value: number | string): string {
   return String(rounded)
 }
 
+/**
+ * Amount entry the way a till does it: the cashier types the céntimos and the
+ * field shows the amount, so the decimal separator never has to be typed. "104"
+ * becomes "1.04" and "45784" becomes "457.84". Only digits are read, so a stray
+ * separator or letter cannot break the value.
+ */
+export function digitsToAmount(digits: string): string {
+  const clean = digits.replace(/\D/g, '')
+  if (clean === '') return ''
+  return (Number.parseInt(clean, 10) / 100).toFixed(MONEY_PLACES)
+}
+
+/**
+ * Works out the digits of a digits-based amount field after a keystroke.
+ *
+ * Reading the digits back off the input is ambiguous, because the field already
+ * shows a separator: with "457.84" on screen, typing a "5" at the end arrives as
+ * "457.845" and has to mean "45784" plus "5", not the digits "0457845". A typed
+ * character is therefore recognised by checking that the value the field already
+ * displayed is still a prefix of the new one. Anything else is a deletion, a
+ * paste or a selection, and its digits are taken exactly as they arrived.
+ */
+export function nextAmountDigits(currentAmount: string, rawValue: string): string {
+  const typed = rawValue.replace(/\D/g, '')
+  if (currentAmount !== '' && rawValue.startsWith(currentAmount)) {
+    return currentAmount.replace(/\D/g, '') + typed.slice(currentAmount.replace(/\D/g, '').length)
+  }
+  return typed
+}
+
 const usdFormatter = new Intl.NumberFormat('es-VE', {
   style: 'currency',
   currency: 'USD',
-  minimumFractionDigits: MONEY_PLACES,
-  maximumFractionDigits: MONEY_PLACES,
-})
-
-const vesFormatter = new Intl.NumberFormat('es-VE', {
-  style: 'currency',
-  currency: 'VES',
   minimumFractionDigits: MONEY_PLACES,
   maximumFractionDigits: MONEY_PLACES,
 })
@@ -77,8 +100,15 @@ export function formatUsdCompact(value: string | number | null | undefined): str
   return usdCompactFormatter.format(parseMoney(value))
 }
 
+const vesNumberFormatter = new Intl.NumberFormat('es-VE', {
+  minimumFractionDigits: MONEY_PLACES,
+  maximumFractionDigits: MONEY_PLACES,
+})
+
 export function formatVes(value: string | number | null | undefined): string {
-  return vesFormatter.format(parseMoney(value))
+  // The ISO code is the project's currency denomination: never "Bs." nor the
+  // locale symbol. See AGENTS.md (Denominación de moneda).
+  return `VES ${vesNumberFormatter.format(parseMoney(value))}`
 }
 
 export function formatMoney(

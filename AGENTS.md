@@ -28,7 +28,9 @@ Antes de implementar una regla que no esté definida, pregunta de forma concreta
 * Si una venta fiada admite abonos parciales, múltiples deudas acumuladas o únicamente pago total.
 * Tratamiento de anulaciones, devoluciones de mercancía y productos con fecha de vencimiento.
 
-**Convención Inicial:** Se usa el **USD** como moneda base de precios. El cálculo a **VES** se realiza mediante la tasa vigente publicada por el Banco Central de Venezuela (https://www.bcv.org.ve/) expresada como “VES por 1 USD”. El backend guardará por separado la fecha de vigencia publicada por el BCV y la fecha de consulta de la API. 
+**Convención Inicial:** Se usa el **USD** como moneda base de precios. El cálculo a **VES** se realiza mediante la tasa vigente publicada por el Banco Central de Venezuela (https://www.bcv.org.ve/) expresada como “VES por 1 USD”. El backend guardará por separado la fecha de vigencia publicada por el BCV y la fecha de consulta de la API.
+
+**Denominación de moneda:** Toda referencia a bolívares usa el código ISO **VES** (sin símbolo "Bs", "Bs.", "BSS" ni texto "bolívares"). Ejemplos correctos: "Efectivo VES", "Transferencia VES", "Tasa (VES por 1 USD)", totales formateados como `VES 1.234,56`. El USD se abrevia como **USD** de la misma forma. Aplica en UI, textos, documentación y código. 
 
 ### Reglas del dominio
 

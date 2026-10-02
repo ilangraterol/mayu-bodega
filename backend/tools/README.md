@@ -49,6 +49,7 @@ Variables opcionales:
 | `cleanup_image_rows.py`      | Repara filas huérfanas, principales duplicadas y archivos sueltos | con `--apply` |
 | `check_category_filter.py`   | Comprueba que `GET /api/products/?category=<id>` filtra de verdad y cuenta los artículos sin categoría | no      |
 | `purge_api_tokens.py`        | Borra los tokens de DRF antes de subir `db.sqlite3` al repo, para que no den acceso a la API pública | con `--apply` |
+| `compare_envs.py`            | Compara el catálogo local contra un servidor remoto (API) por `code`, y cuenta por separado los datos de negocio que se perderían al reemplazar `db.sqlite3` | no |
 
 `_common.py` no es un script: contiene el arranque de Django, el cliente HTTP y
 los ayudantes de salida que comparten todos los demás.
@@ -73,6 +74,11 @@ los ayudantes de salida que comparten todos los demás.
 
 # Ver qué le hizo seed_demo a un catálogo real (solo informe)
 ..\.venv\Scripts\python.exe tools\audit_seed_contamination.py
+
+# Ver si la base local y la de producción son equivalentes antes de hacer push
+$env:MAYU_PASSWORD = '...'
+..\.venv\Scripts\python.exe tools\compare_envs.py --remote https://mayu-bodega.onrender.com
+Remove-Item Env:\MAYU_PASSWORD
 
 # Sacar del catálogo las categorías y artículos del seed
 ..\.venv\Scripts\python.exe tools\purge_seed_catalog.py

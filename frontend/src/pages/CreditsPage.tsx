@@ -244,7 +244,7 @@ function PaymentSheet({ debt, onClose }: { debt: CustomerDebt | null; onClose: (
                   : 'border-slate-300 bg-white text-slate-700'
               }`}
             >
-              Dollars
+              Dólares
             </button>
             <button
               type="button"

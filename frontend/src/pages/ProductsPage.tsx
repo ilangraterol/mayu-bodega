@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 
 import { CategoryChips } from '../components/catalog/CategoryChips'
 import { ProductImage } from '../components/products/ProductImage'
-import { ProductImages } from '../components/products/ProductImages'
 import { Button } from '../components/ui/Button'
 import { EmptyState, ErrorState } from '../components/ui/Feedback'
 import { TextInput } from '../components/ui/Field'
@@ -12,9 +11,11 @@ import { Badge, Card } from '../components/ui/Primitives'
 import { Sheet } from '../components/ui/Sheet'
 import { useProduct, useProducts, useUpdateProduct } from '../hooks/useProducts'
 import { useCategoryOptions } from '../hooks/useCategories'
+import { useCurrentRate } from '../hooks/useRates'
+import { useExactBarcodeOpen } from '../hooks/useExactBarcodeOpen'
 import { NumberInput, Select, TextInput as Input, Toggle } from '../components/ui/Field'
 import { UNIT_OPTIONS, UNIT_LABELS } from '../lib/labels'
-import { formatQuantity, formatUsd } from '../lib/money'
+import { formatQuantity, formatUsd, formatVes, parseMoney, roundMoney } from '../lib/money'
 import type { Product, ProductPayload, UnitOfMeasure } from '../types/api'
 
 export function ProductsPage() {
@@ -25,6 +26,8 @@ export function ProductsPage() {
   const [category, setCategory] = useState<number | null>(null)
 
   const categories = useCategoryOptions()
+  const rate = useCurrentRate()
+  const rateVes = rate.data ? parseMoney(rate.data.rate) : null
 
   const products = useProducts({
     search: search.trim() || undefined,
@@ -32,6 +35,10 @@ export function ProductsPage() {
     category,
     pageSize: 50,
   })
+
+  // A barcode is an exact identity, so a full one goes straight to the article
+  // sheet instead of waiting to be picked from the grid.
+  useExactBarcodeOpen({ value: search, onMatch: (product) => setEditing(product.id) })
 
   // The URL keeps the "stock bajo" filter shareable, so the dashboard can link
   // straight to it. It is written from the toggle handler, not from an effect.
@@ -48,6 +55,7 @@ export function ProductsPage() {
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder="Nombre, marca, código o código de barras"
+        hint="Un código de barras completo abre el artículo de una vez."
         autoCapitalize="none"
       />
 
@@ -123,6 +131,11 @@ export function ProductsPage() {
                         {product.code} · {formatUsd(product.price_usd)} ·{' '}
                         {UNIT_LABELS[product.unit_of_measure]}
                       </p>
+                      {rateVes !== null ? (
+                        <p className="tabular text-xs font-semibold text-slate-600">
+                          {formatVes(roundMoney(parseMoney(product.price_usd) * rateVes))}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="tabular text-sm font-semibold text-slate-900">
@@ -148,23 +161,24 @@ export function ProductsPage() {
 function ProductSheet({ id, onClose }: { id: number | null; onClose: () => void }) {
   const product = useProduct(id)
 
-  return (
-    <Sheet
-      open={id !== null}
-      onClose={onClose}
-      title={product.data ? product.data.name : 'Producto'}
-    >
-      {product.isLoading ? (
-        <ListSkeleton count={4} />
-      ) : product.isError ? (
-        <ErrorState error={product.error} onRetry={product.refetch} />
-      ) : product.data ? (
-        // `key` remounts the form per product, so its state starts from the
-        // loaded record and the mutation starts without a previous error.
-        <ProductForm key={product.data.id} product={product.data} />
-      ) : null}
-    </Sheet>
-  )
+  if (id === null) return null
+
+  if (!product.data) {
+    return (
+      <Sheet open onClose={onClose} title="Producto">
+        {product.isLoading ? (
+          <ListSkeleton count={4} />
+        ) : product.isError ? (
+          <ErrorState error={product.error} onRetry={product.refetch} />
+        ) : null}
+      </Sheet>
+    )
+  }
+
+  // `key` remounts the form per product, so its state starts from the loaded
+  // record and the mutation starts without a previous error. The form owns the
+  // sheet because the save button has to sit in the pinned footer.
+  return <ProductForm key={product.data.id} product={product.data} onClose={onClose} />
 }
 
 function toForm(product: Product): ProductPayload {
@@ -184,7 +198,7 @@ function toForm(product: Product): ProductPayload {
   }
 }
 
-function ProductForm({ product }: { product: Product }) {
+function ProductForm({ product, onClose }: { product: Product; onClose: () => void }) {
   const update = useUpdateProduct(product.id)
   const categories = useCategoryOptions()
   // Initialized directly from the record: no effect, no cascading render.
@@ -197,7 +211,12 @@ function ProductForm({ product }: { product: Product }) {
       category: form.category ?? null,
       surcharge_percentage: form.surcharge_percentage === '' ? null : form.surcharge_percentage,
     }
-    await update.mutate(payload).catch(() => undefined)
+    try {
+      await update.mutate(payload)
+      onClose()
+    } catch {
+      // The banner below shows the failure, so the sheet stays open.
+    }
   }
 
   const categoryOptions = (categories.data?.results ?? []).map((category) => ({
@@ -206,25 +225,62 @@ function ProductForm({ product }: { product: Product }) {
   }))
 
   return (
-    <>
-      <div className="space-y-3">
-        <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-          <p>
-            Código: <span className="tabular font-medium">{product.code}</span>
-          </p>
-          <p className="mt-1">
-            Existencias:{' '}
-            <span className="tabular font-medium">{formatQuantity(product.stock)}</span>
-            {Number.parseFloat(product.pending_units) > 0 ? (
-              <span className="text-red-600">
-                {' '}
-                · debe {formatQuantity(product.pending_units)}
+    <Sheet
+      open
+      onClose={onClose}
+      title={product.name}
+      footer={
+        <Button
+          fullWidth
+          size="lg"
+          isLoading={update.isPending}
+          disabled={!form.name.trim()}
+          onClick={onSave}
+        >
+          Guardar cambios
+        </Button>
+      }
+    >
+      <div className="space-y-2.5">
+        <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-2.5 text-xs text-slate-600">
+          <div className="size-12 shrink-0 overflow-hidden rounded-lg">
+            <ProductImage src={product.primary_image_url} alt={product.name} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5">
+              <span>
+                Código <span className="tabular font-medium text-slate-800">{product.code}</span>
               </span>
-            ) : null}
-          </p>
-          <p className="mt-1 text-slate-500">
-            El stock solo cambia por notas de entrada, salidas y ventas.
-          </p>
+              <span>
+                Existencias{' '}
+                <span className="tabular font-medium text-slate-800">
+                  {formatQuantity(product.stock)}
+                </span>
+                {Number.parseFloat(product.pending_units) > 0 ? (
+                  <span className="text-red-600">
+                    {' '}
+                    · debe {formatQuantity(product.pending_units)}
+                  </span>
+                ) : null}
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              El stock solo cambia por notas de entrada, salidas y ventas.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <NumberInput
+            label="Costo (USD)"
+            value={form.cost_usd}
+            onChange={(event) => setForm({ ...form, cost_usd: event.target.value })}
+          />
+          <NumberInput
+            label="Precio (USD)"
+            value={form.price_usd}
+            onChange={(event) => setForm({ ...form, price_usd: event.target.value })}
+          />
         </div>
 
         <Input
@@ -233,17 +289,21 @@ function ProductForm({ product }: { product: Product }) {
           value={form.name}
           onChange={(event) => setForm({ ...form, name: event.target.value })}
         />
-        <Input
-          label="Código de barras"
-          value={form.barcode ?? ''}
-          onChange={(event) => setForm({ ...form, barcode: event.target.value || null })}
-          autoCapitalize="none"
-        />
-        <Input
-          label="Marca"
-          value={form.brand}
-          onChange={(event) => setForm({ ...form, brand: event.target.value })}
-        />
+
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            label="Código de barras"
+            value={form.barcode ?? ''}
+            onChange={(event) => setForm({ ...form, barcode: event.target.value || null })}
+            autoCapitalize="none"
+          />
+          <Input
+            label="Marca"
+            value={form.brand}
+            onChange={(event) => setForm({ ...form, brand: event.target.value })}
+          />
+        </div>
+
         <Select
           label="Categoría"
           hint="Aporta el recargo por defecto de sus artículos."
@@ -254,6 +314,7 @@ function ProductForm({ product }: { product: Product }) {
           options={categoryOptions}
           placeholder="Sin categoría (hereda de la tienda)"
         />
+
         <NumberInput
           label="Recargo propio (%)"
           hint={
@@ -267,45 +328,32 @@ function ProductForm({ product }: { product: Product }) {
           value={form.surcharge_percentage ?? ''}
           onChange={(event) => setForm({ ...form, surcharge_percentage: event.target.value })}
         />
-        <Select
-          label="Unidad de medida"
-          value={form.unit_of_measure}
-          onChange={(event) =>
-            setForm({ ...form, unit_of_measure: event.target.value as UnitOfMeasure })
-          }
-          options={UNIT_OPTIONS}
-        />
-        <NumberInput
-          label="Unidades por empaque"
-          hint="Equivalencia interna de un bulto o paquete."
-          value={String(form.units_per_package ?? 1)}
-          onChange={(event) =>
-            setForm({ ...form, units_per_package: Number(event.target.value) || 1 })
-          }
-          step="1"
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <NumberInput
-            label="Costo (USD)"
-            value={form.cost_usd}
-            onChange={(event) => setForm({ ...form, cost_usd: event.target.value })}
+
+        <div className="grid grid-cols-2 gap-2">
+          <Select
+            label="Unidad de medida"
+            value={form.unit_of_measure}
+            onChange={(event) =>
+              setForm({ ...form, unit_of_measure: event.target.value as UnitOfMeasure })
+            }
+            options={UNIT_OPTIONS}
           />
           <NumberInput
-            label="Precio (USD)"
-            value={form.price_usd}
-            onChange={(event) => setForm({ ...form, price_usd: event.target.value })}
+            label="Por empaque"
+            value={String(form.units_per_package ?? 1)}
+            onChange={(event) =>
+              setForm({ ...form, units_per_package: Number(event.target.value) || 1 })
+            }
+            step="1"
           />
         </div>
+
         <Toggle
           label="Producto activo"
-          description="Los inactivos no aparecen en el punto de venta."
+          description="Los inactivos no se venden."
           checked={form.is_active ?? true}
           onChange={(checked) => setForm({ ...form, is_active: checked })}
         />
-
-        <div className="border-t border-slate-100 pt-3">
-          <ProductImages product={product} />
-        </div>
 
         {update.isPending ? null : update.error ? (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
@@ -313,18 +361,6 @@ function ProductForm({ product }: { product: Product }) {
           </p>
         ) : null}
       </div>
-
-      <div className="mt-4">
-        <Button
-          fullWidth
-          size="lg"
-          isLoading={update.isPending}
-          disabled={!form.name.trim()}
-          onClick={onSave}
-        >
-          Guardar cambios
-        </Button>
-      </div>
-    </>
+    </Sheet>
   )
 }

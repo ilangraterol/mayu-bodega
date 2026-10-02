@@ -47,3 +47,6 @@ Thumbs.db
 
 # Logs
 *.log
+# stderr de los servidores locales: los deja bloqueados el proceso que los
+# escribe, asi que no se pueden borrar mientras corren.
+*.err

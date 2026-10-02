@@ -2,20 +2,12 @@
  * Server-calculated cart totals. Never computed on the client.
  *
  * Each line carries its own surcharge, so a single percentage over the subtotal
- * would be a lie. The breakdown is therefore per line, and the headline
- * percentage is only shown as the subtotal-weighted average the sale records.
+ * would be a lie. The breakdown is therefore per line, and no blended average
+ * is shown: the cashier reads the real percentage that applies to each article.
  */
 
-import { formatPercent, formatRate, formatUsd, formatVes, parseMoney } from '../../lib/money'
-import { SURCHARGE_SOURCE } from '../../types/api'
+import { formatNumber, formatPercent, formatUsd, formatVes, parseMoney } from '../../lib/money'
 import type { Quote } from '../../types/api'
-
-const SOURCE_LABELS: Record<string, string> = {
-  [SURCHARGE_SOURCE.PRODUCT]: 'del artículo',
-  [SURCHARGE_SOURCE.CATEGORY]: 'de la categoría',
-  [SURCHARGE_SOURCE.STORE]: 'de la tienda',
-  [SURCHARGE_SOURCE.MANUAL]: 'elegido en el carrito',
-}
 
 export function QuoteSummary({ quote }: { quote: Quote }) {
   const hasSurcharge = parseMoney(quote.surcharge_usd) > 0
@@ -36,23 +28,13 @@ export function QuoteSummary({ quote }: { quote: Quote }) {
             <div key={line.product_id} className="flex justify-between gap-2 text-xs">
               <span className="min-w-0 truncate text-slate-500">
                 {line.product_name}{' '}
-                <span className="tabular">+{formatPercent(line.surcharge_percentage)}</span>{' '}
-                <span className="text-slate-400">
-                  {SOURCE_LABELS[line.surcharge_source] ?? ''}
-                </span>
+                <span className="tabular">+{formatPercent(line.surcharge_percentage)}</span>
               </span>
               <span className="tabular shrink-0 text-slate-600">
                 {formatUsd(line.surcharge_usd)}
               </span>
             </div>
           ))}
-          <div className="flex justify-between border-t border-slate-200 pt-1 text-slate-500">
-            <span>
-              Recargo <span className="tabular">{formatPercent(quote.surcharge_percentage)}</span>{' '}
-              prom.
-            </span>
-            <span className="tabular">{formatUsd(quote.surcharge_usd)}</span>
-          </div>
         </div>
       ) : null}
 
@@ -61,7 +43,7 @@ export function QuoteSummary({ quote }: { quote: Quote }) {
         <span className="tabular">{formatUsd(quote.total_usd)}</span>
       </div>
       <div className="mt-0.5 flex justify-between text-xs text-slate-500">
-        <span>Tasa {formatRate(quote.exchange_rate_applied)}</span>
+        <span>Tasa {formatNumber(quote.exchange_rate_applied, 2)}</span>
         <span className="tabular">{formatVes(quote.total_ves)}</span>
       </div>
     </div>

@@ -27,9 +27,12 @@ interface UseBarcodeScannerOptions {
 type ScannerState = 'idle' | 'resolving' | 'not_found'
 
 const DEBOUNCE_MS = 250
-/** Only digits can be a barcode; letters are the cashier typing a name. */
-const BARCODE_SHAPE = /^\d+$/
-const MIN_BARCODE_LENGTH = 4
+/**
+ * Only digits can be a barcode; letters are the cashier typing a name. Exported
+ * because the catalogue screen asks the same question before opening an article.
+ */
+export const BARCODE_SHAPE = /^\d+$/
+export const MIN_BARCODE_LENGTH = 4
 
 export function useBarcodeScanner({ onResolved }: UseBarcodeScannerOptions) {
   const [code, setCode] = useState('')
